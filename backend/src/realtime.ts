@@ -1,0 +1,251 @@
+import { WebSocket, WebSocketServer } from 'ws';
+import type { Server } from 'node:http';
+import * as Y from 'yjs';
+import * as syncProtocol from 'y-protocols/sync';
+import { Awareness, removeAwarenessStates, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
+import * as encoding from 'lib0/encoding';
+import * as decoding from 'lib0/decoding';
+import {
+  addUser,
+  createFile,
+  deleteFile,
+  getRoom,
+  getRoomDoc,
+  nextColor,
+  removeUser,
+  renameFile,
+  selectFile,
+  serializeFiles,
+  serializeRoom
+} from './rooms.js';
+import type { ClientMessage, Room } from './types.js';
+import { runPythonFile } from './runner.js';
+
+const messageSync = 0;
+const messageAwareness = 1;
+
+type YRoom = {
+  doc: Y.Doc;
+  awareness: Awareness;
+  conns: Map<WebSocket, Set<number>>;
+};
+
+const yRooms = new Map<string, YRoom>();
+
+function send(ws: WebSocket, payload: unknown) {
+  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
+}
+
+export function broadcast(room: Room, payload: unknown) {
+  const data = JSON.stringify(payload);
+  for (const ws of room.clients.values()) {
+    if (ws.readyState === WebSocket.OPEN) ws.send(data);
+  }
+}
+
+export function attachRealtime(server: Server) {
+  const apiWss = new WebSocketServer({ noServer: true });
+  const yWss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (request, socket, head) => {
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    if (url.pathname === '/ws') {
+      apiWss.handleUpgrade(request, socket, head, (ws) => apiWss.emit('connection', ws, request));
+      return;
+    }
+    if (url.pathname.startsWith('/yjs/')) {
+      yWss.handleUpgrade(request, socket, head, (ws) => yWss.emit('connection', ws, request));
+      return;
+    }
+    socket.destroy();
+  });
+
+  apiWss.on('connection', (ws) => {
+    let joinedRoomId: string | null = null;
+    let joinedClientId: string | null = null;
+
+    ws.on('message', async (raw) => {
+      try {
+        const message = JSON.parse(raw.toString()) as ClientMessage;
+        const room = getRoom(message.roomId);
+        if (!room) {
+          send(ws, { type: 'error', message: 'Комната не найдена' });
+          return;
+        }
+
+        if (message.type === 'joinRoom') {
+          const name = message.name.trim();
+          if (!name) throw new Error('Имя пользователя не может быть пустым');
+          joinedRoomId = room.roomId;
+          joinedClientId = message.clientId;
+          room.clients.set(message.clientId, ws);
+          addUser(room, {
+            clientId: message.clientId,
+            name,
+            color: message.color || nextColor(room.users.length)
+          });
+          send(ws, { type: 'roomState', room: serializeRoom(room) });
+          broadcast(room, { type: 'usersUpdated', users: room.users });
+          return;
+        }
+
+        if (message.type === 'leaveRoom') {
+          removeUser(room, message.clientId);
+          broadcast(room, { type: 'usersUpdated', users: room.users });
+          return;
+        }
+
+        if (message.type === 'createFile') {
+          createFile(room, message.name);
+          broadcast(room, { type: 'filesUpdated', files: serializeFiles(room) });
+          return;
+        }
+
+        if (message.type === 'renameFile') {
+          renameFile(room, message.fileId, message.name);
+          broadcast(room, { type: 'filesUpdated', files: serializeFiles(room) });
+          return;
+        }
+
+        if (message.type === 'deleteFile') {
+          deleteFile(room, message.fileId);
+          broadcast(room, { type: 'filesUpdated', files: serializeFiles(room) });
+          broadcast(room, { type: 'activeFileUpdated', activeFileId: room.activeFileId });
+          return;
+        }
+
+        if (message.type === 'selectFile') {
+          selectFile(room, message.fileId);
+          broadcast(room, { type: 'activeFileUpdated', activeFileId: room.activeFileId });
+          return;
+        }
+
+        if (message.type === 'runCode') {
+          await runAndBroadcast(room, message.fileId);
+        }
+      } catch (error) {
+        send(ws, { type: 'error', message: error instanceof Error ? error.message : 'Неизвестная ошибка' });
+      }
+    });
+
+    ws.on('close', () => {
+      if (!joinedRoomId || !joinedClientId) return;
+      const room = getRoom(joinedRoomId);
+      if (!room) return;
+      removeUser(room, joinedClientId);
+      broadcast(room, { type: 'usersUpdated', users: room.users });
+    });
+  });
+
+  yWss.on('connection', (ws, request) => {
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    const roomId = decodeURIComponent(url.pathname.replace('/yjs/', ''));
+    setupYjsConnection(ws, roomId);
+  });
+}
+
+export async function runAndBroadcast(room: Room, fileId: string) {
+  const file = room.files.find((item) => item.id === fileId);
+  if (!file) throw new Error('Файл не найден');
+  if (file.language !== 'python') throw new Error('Можно запускать только Python-файлы');
+
+  room.lastRun = { status: 'running', stdout: '', stderr: '', exitCode: null };
+  broadcast(room, { type: 'runStarted', result: room.lastRun });
+
+  const doc = getRoomDoc(room.roomId);
+  const files = room.files.map((item) => ({
+    name: item.name,
+    content: doc.getText(`file:${item.id}`).toString()
+  }));
+  const result = await runPythonFile(file.name, files);
+  room.lastRun = result;
+  broadcast(room, { type: 'runFinished', result });
+  return result;
+}
+
+function getYRoom(roomId: string): YRoom {
+  let yRoom = yRooms.get(roomId);
+  if (!yRoom) {
+    const doc = getRoomDoc(roomId);
+    yRoom = {
+      doc,
+      awareness: new Awareness(doc),
+      conns: new Map()
+    };
+    yRoom.awareness.setLocalState(null);
+    yRoom.awareness.on('update', ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }, origin: WebSocket | null) => {
+      const changedClients = added.concat(updated, removed);
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, messageAwareness);
+      encoding.writeVarUint8Array(encoder, encodeAwarenessUpdate(yRoom!.awareness, changedClients));
+      const buff = encoding.toUint8Array(encoder);
+      for (const conn of yRoom!.conns.keys()) {
+        if (conn !== origin && conn.readyState === WebSocket.OPEN) conn.send(buff);
+      }
+    });
+    doc.on('update', (update: Uint8Array, origin: WebSocket | null) => {
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, messageSync);
+      syncProtocol.writeUpdate(encoder, update);
+      const message = encoding.toUint8Array(encoder);
+      for (const conn of yRoom!.conns.keys()) {
+        if (conn !== origin && conn.readyState === WebSocket.OPEN) conn.send(message);
+      }
+    });
+    yRooms.set(roomId, yRoom);
+  }
+  return yRoom;
+}
+
+function setupYjsConnection(ws: WebSocket, roomId: string) {
+  const yRoom = getYRoom(roomId);
+  yRoom.conns.set(ws, new Set());
+
+  ws.on('message', (message: Buffer) => {
+    const encoder = encoding.createEncoder();
+    const decoder = decoding.createDecoder(new Uint8Array(message));
+    const messageType = decoding.readVarUint(decoder);
+
+    if (messageType === messageSync) {
+      encoding.writeVarUint(encoder, messageSync);
+      syncProtocol.readSyncMessage(decoder, encoder, yRoom.doc, ws);
+      const reply = encoding.toUint8Array(encoder);
+      if (reply.length > 1 && ws.readyState === WebSocket.OPEN) ws.send(reply);
+      return;
+    }
+
+    if (messageType === messageAwareness) {
+      const update = decoding.readVarUint8Array(decoder);
+      const controlledIds = yRoom.conns.get(ws);
+      if (controlledIds) {
+        const updateDecoder = decoding.createDecoder(update);
+        const len = decoding.readVarUint(updateDecoder);
+        for (let i = 0; i < len; i += 1) {
+          controlledIds.add(decoding.readVarUint(updateDecoder));
+          decoding.readVarUint(updateDecoder);
+          decoding.readVarString(updateDecoder);
+        }
+      }
+      applyAwarenessUpdate(yRoom.awareness, update, ws);
+    }
+  });
+
+  ws.on('close', () => {
+    const controlledIds = yRoom.conns.get(ws);
+    yRoom.conns.delete(ws);
+    if (controlledIds) removeAwarenessStates(yRoom.awareness, Array.from(controlledIds), ws);
+  });
+
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, messageSync);
+  syncProtocol.writeSyncStep1(encoder, yRoom.doc);
+  ws.send(encoding.toUint8Array(encoder));
+
+  const states = Array.from(yRoom.awareness.getStates().keys());
+  if (states.length > 0) {
+    const awarenessEncoder = encoding.createEncoder();
+    encoding.writeVarUint(awarenessEncoder, messageAwareness);
+    encoding.writeVarUint8Array(awarenessEncoder, encodeAwarenessUpdate(yRoom.awareness, states));
+    ws.send(encoding.toUint8Array(awarenessEncoder));
+  }
+}
