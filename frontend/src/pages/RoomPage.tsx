@@ -1,4 +1,4 @@
-import Editor, { OnMount } from '@monaco-editor/react';
+import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
 import type { FormEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,6 +17,19 @@ const emptyRun: RunResult = {
   exitCode: null
 };
 
+const editorFontSizeStorageKey = 'editorFontSize';
+const minEditorFontSize = 12;
+const maxEditorFontSize = 22;
+
+function clampEditorFontSize(size: number) {
+  return Math.min(maxEditorFontSize, Math.max(minEditorFontSize, size));
+}
+
+function getStoredEditorFontSize() {
+  const saved = Number(localStorage.getItem(editorFontSizeStorageKey));
+  return Number.isFinite(saved) ? clampEditorFontSize(saved) : 14;
+}
+
 function getClientId() {
   const existing = sessionStorage.getItem('clientId');
   if (existing) return existing;
@@ -34,6 +47,84 @@ function getUserColor() {
   return color;
 }
 
+function getEditorThemeName(theme: 'dark' | 'light') {
+  return theme === 'dark' ? 'coderoom-dark' : 'coderoom-light';
+}
+
+function defineEditorThemes(monacoInstance: typeof monaco) {
+  monacoInstance.editor.defineTheme('coderoom-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '7f8a9e', fontStyle: 'italic' },
+      { token: 'keyword', foreground: 'a78bfa' },
+      { token: 'number', foreground: '22d3ee' },
+      { token: 'string', foreground: '86efac' },
+      { token: 'type', foreground: '93c5fd' },
+      { token: 'function', foreground: 'f8fafc' },
+      { token: 'delimiter', foreground: '94a3b8' }
+    ],
+    colors: {
+      'editor.background': '#101116',
+      'editor.foreground': '#e6edf7',
+      'editorLineNumber.foreground': '#4b5568',
+      'editorLineNumber.activeForeground': '#c4b5fd',
+      'editorCursor.foreground': '#22d3ee',
+      'editor.selectionBackground': '#7c5cff55',
+      'editor.inactiveSelectionBackground': '#7c5cff2f',
+      'editor.lineHighlightBackground': '#ffffff08',
+      'editor.lineHighlightBorder': '#00000000',
+      'editorIndentGuide.background1': '#ffffff12',
+      'editorIndentGuide.activeBackground1': '#22d3ee66',
+      'editorBracketMatch.background': '#22d3ee1f',
+      'editorBracketMatch.border': '#22d3ee88',
+      'scrollbarSlider.background': '#ffffff20',
+      'scrollbarSlider.hoverBackground': '#ffffff2f',
+      'scrollbarSlider.activeBackground': '#7c5cff80',
+      'editorWidget.background': '#171923',
+      'editorWidget.border': '#ffffff14',
+      'editorSuggestWidget.background': '#171923',
+      'editorSuggestWidget.border': '#ffffff14'
+    }
+  });
+
+  monacoInstance.editor.defineTheme('coderoom-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '667085', fontStyle: 'italic' },
+      { token: 'keyword', foreground: '6941c6' },
+      { token: 'number', foreground: '0891b2' },
+      { token: 'string', foreground: '047857' },
+      { token: 'type', foreground: '2563eb' },
+      { token: 'function', foreground: '0f172a' },
+      { token: 'delimiter', foreground: '64748b' }
+    ],
+    colors: {
+      'editor.background': '#ffffff',
+      'editor.foreground': '#172033',
+      'editorLineNumber.foreground': '#a0aec0',
+      'editorLineNumber.activeForeground': '#6250f6',
+      'editorCursor.foreground': '#0891b2',
+      'editor.selectionBackground': '#6250f630',
+      'editor.inactiveSelectionBackground': '#6250f61f',
+      'editor.lineHighlightBackground': '#6250f608',
+      'editor.lineHighlightBorder': '#00000000',
+      'editorIndentGuide.background1': '#0f172a14',
+      'editorIndentGuide.activeBackground1': '#0891b266',
+      'editorBracketMatch.background': '#0891b217',
+      'editorBracketMatch.border': '#0891b277',
+      'scrollbarSlider.background': '#0f172a20',
+      'scrollbarSlider.hoverBackground': '#0f172a30',
+      'scrollbarSlider.activeBackground': '#6250f670',
+      'editorWidget.background': '#ffffff',
+      'editorWidget.border': '#d8e0eb',
+      'editorSuggestWidget.background': '#ffffff',
+      'editorSuggestWidget.border': '#d8e0eb'
+    }
+  });
+}
+
 export function RoomPage() {
   const { roomId = '' } = useParams();
   const navigate = useNavigate();
@@ -47,6 +138,7 @@ export function RoomPage() {
   const [socketReady, setSocketReady] = useState(false);
   const [runResult, setRunResult] = useState<RunResult>(emptyRun);
   const [editorMounted, setEditorMounted] = useState(false);
+  const [editorFontSize, setEditorFontSize] = useState(getStoredEditorFontSize);
 
   const wsRef = useRef<WebSocket | null>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
@@ -184,8 +276,18 @@ export function RoomPage() {
   }, [activeFile?.id, activeFile?.language, editorMounted]);
 
   useEffect(() => {
-    monacoRef.current?.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'light');
+    if (!monacoRef.current) return;
+    defineEditorThemes(monacoRef.current);
+    monacoRef.current.editor.setTheme(getEditorThemeName(theme));
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem(editorFontSizeStorageKey, String(editorFontSize));
+    editorRef.current?.updateOptions({
+      fontSize: editorFontSize,
+      lineHeight: Math.round(editorFontSize * 1.65)
+    });
+  }, [editorFontSize]);
 
   const send = (payload: Record<string, unknown>) => {
     setError('');
@@ -231,6 +333,10 @@ export function RoomPage() {
     send({ type: 'stopCode' });
   }
 
+  function changeEditorFontSize(delta: number) {
+    setEditorFontSize((current) => clampEditorFontSize(current + delta));
+  }
+
   useEffect(() => {
     runCodeRef.current = runCode;
   }, [runCode]);
@@ -246,10 +352,15 @@ export function RoomPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const handleEditorBeforeMount: BeforeMount = (monacoInstance) => {
+    defineEditorThemes(monacoInstance);
+  };
+
   const handleEditorMount: OnMount = (editor, monacoInstance) => {
     editorRef.current = editor;
     monacoRef.current = monacoInstance;
-    monacoInstance.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'light');
+    defineEditorThemes(monacoInstance);
+    monacoInstance.editor.setTheme(getEditorThemeName(theme));
     editor.addAction({
       id: 'run-code',
       label: 'Run code',
@@ -353,11 +464,45 @@ export function RoomPage() {
               <span className="editorDot" />
               <span>{activeFile?.name || 'Файл не выбран'}</span>
             </div>
-            <span className="shortcutHint">Ctrl Enter</span>
+            <div className="editorTools">
+              <div className="fontSizeControl" aria-label="Размер шрифта редактора">
+                <button type="button" onClick={() => changeEditorFontSize(-1)} disabled={editorFontSize <= minEditorFontSize}>
+                  A-
+                </button>
+                <span>{editorFontSize}</span>
+                <button type="button" onClick={() => changeEditorFontSize(1)} disabled={editorFontSize >= maxEditorFontSize}>
+                  A+
+                </button>
+              </div>
+              <span className="shortcutHint">Ctrl Enter</span>
+            </div>
           </div>
           <Editor
-            theme={theme === 'dark' ? 'vs-dark' : 'light'}
-            options={{ minimap: { enabled: false }, fontSize: 14, tabSize: 4, automaticLayout: true }}
+            theme={getEditorThemeName(theme)}
+            beforeMount={handleEditorBeforeMount}
+            options={{
+              minimap: { enabled: false },
+              fontSize: editorFontSize,
+              lineHeight: Math.round(editorFontSize * 1.65),
+              fontFamily: '"Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace',
+              fontLigatures: true,
+              tabSize: 4,
+              automaticLayout: true,
+              scrollBeyondLastLine: false,
+              smoothScrolling: true,
+              cursorBlinking: 'smooth',
+              cursorSmoothCaretAnimation: 'on',
+              renderLineHighlight: 'all',
+              overviewRulerBorder: false,
+              padding: { top: 18, bottom: 18 },
+              bracketPairColorization: { enabled: true },
+              guides: { bracketPairs: true, indentation: true },
+              scrollbar: {
+                verticalScrollbarSize: 10,
+                horizontalScrollbarSize: 10,
+                useShadows: false
+              }
+            }}
             onMount={handleEditorMount}
           />
         </section>

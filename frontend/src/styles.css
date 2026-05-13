@@ -595,7 +595,9 @@ input:focus {
 .editorPane {
   display: flex;
   flex-direction: column;
-  background: var(--editor-bg);
+  background:
+    radial-gradient(circle at 18% 0%, rgb(124 92 255 / 0.08), transparent 24rem),
+    var(--editor-bg);
 }
 
 .editorTitle {
@@ -641,6 +643,56 @@ input:focus {
   white-space: nowrap;
 }
 
+.editorTools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.fontSizeControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.035);
+  padding: 3px;
+}
+
+:root[data-theme='light'] .fontSizeControl {
+  background: rgb(15 23 42 / 0.035);
+}
+
+.fontSizeControl button {
+  min-width: 32px;
+  height: 22px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 7px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 820;
+  box-shadow: none;
+}
+
+.fontSizeControl button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.fontSizeControl span {
+  min-width: 24px;
+  color: var(--text);
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+}
+
 .shortcutHint {
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -651,6 +703,24 @@ input:focus {
 .editorPane > section,
 .editorPane .monaco-editor {
   min-height: 0;
+}
+
+.editorPane > section {
+  background: transparent !important;
+}
+
+.editorPane .monaco-editor,
+.editorPane .monaco-editor-background,
+.editorPane .monaco-editor .margin {
+  transition: background-color 160ms ease;
+}
+
+.editorPane .monaco-scrollable-element > .scrollbar > .slider {
+  border-radius: 999px;
+}
+
+.editorPane .monaco-editor .view-overlays .current-line {
+  border-radius: 8px;
 }
 
 .yRemoteSelection {
@@ -948,5 +1018,18 @@ input:focus {
 
   .fileItem {
     grid-template-columns: 1fr;
+  }
+
+  .editorTitle {
+    height: auto;
+    min-height: 48px;
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 10px 12px;
+  }
+
+  .editorTools {
+    width: 100%;
+    justify-content: space-between;
   }
 }
