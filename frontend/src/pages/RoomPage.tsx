@@ -226,6 +226,11 @@ export function RoomPage() {
     send({ type: 'runCode', fileId: activeFile.id });
   }, [activeFile, runResult.status]);
 
+  function stopCode() {
+    if (runResult.status !== 'running') return;
+    send({ type: 'stopCode' });
+  }
+
   useEffect(() => {
     runCodeRef.current = runCode;
   }, [runCode]);
@@ -258,6 +263,7 @@ export function RoomPage() {
     return (
       <main className="centerScreen">
         <div className="notFoundPanel">
+          <div className="emptyIcon">!</div>
           <div className="errorBox">{error}</div>
           <button className="primaryButton" type="button" onClick={() => navigate('/')}>
             На главную
@@ -272,7 +278,9 @@ export function RoomPage() {
       {!joinedName && (
         <div className="modalBackdrop">
           <form className="nameDialog" onSubmit={joinRoom}>
+            <div className="dialogIcon">CC</div>
             <h2>Вход в комнату</h2>
+            <p className="dialogText">Введите имя, которое увидят другие участники.</p>
             <input value={nameInput} onChange={(event) => setNameInput(event.target.value)} placeholder="Ваше имя" autoFocus />
             <button className="primaryButton" type="submit">
               Войти
@@ -282,20 +290,22 @@ export function RoomPage() {
       )}
 
       <header className="topBar">
-        <div>
-          <span className="muted">Комната</span>
-          <strong>{roomId}</strong>
+        <div className="roomIdentity">
+          <div className="brandMark small">CC</div>
+          <div>
+            <span className="muted">Комната</span>
+            <strong>{roomId}</strong>
+          </div>
         </div>
-        <button onClick={() => navigator.clipboard.writeText(window.location.href)}>Скопировать ссылку</button>
-        <ThemeToggle />
-        <div className="connection">{socketReady ? 'Подключено' : 'Отключено'}</div>
-        <div className="users">
-          {room?.users.map((user) => (
-            <span className="userPill" key={user.clientId} style={{ borderColor: user.color }}>
-              <span className="dot" style={{ background: user.color }} />
-              {user.name}
-            </span>
-          ))}
+        <div className="topBarActions">
+          <button className="ghostButton" onClick={() => navigator.clipboard.writeText(window.location.href)}>
+            Скопировать ссылку
+          </button>
+          <ThemeToggle />
+          <div className={`connection ${socketReady ? 'online' : 'offline'}`}>
+            <span className="connectionDot" />
+            {socketReady ? 'Подключено' : 'Отключено'}
+          </div>
         </div>
       </header>
 
@@ -309,28 +319,42 @@ export function RoomPage() {
       <section className="workspace">
         <aside className="sidebar">
           <div className="panelHeader">
-            <h2>Файлы</h2>
-            <button onClick={createFile}>Создать файл</button>
+            <div>
+              <span className="sectionLabel">Workspace</span>
+              <h2>Файлы</h2>
+            </div>
+            <button className="iconTextButton" onClick={createFile}>
+              + Файл
+            </button>
           </div>
           <div className="fileList">
             {room?.files.map((file) => (
               <div className={`fileItem ${file.id === room.activeFileId ? 'active' : ''}`} key={file.id}>
                 <button className="fileName" onClick={() => send({ type: 'selectFile', fileId: file.id })}>
-                  {file.name}
+                  <span className="fileIcon">{file.language === 'python' ? 'PY' : 'TXT'}</span>
+                  <span>{file.name}</span>
                 </button>
-                <button className="smallButton" onClick={() => renameFile(file)} title="Переименовать">
-                  Rename
-                </button>
-                <button className="smallButton danger" onClick={() => deleteFile(file)} title="Удалить">
-                  Delete
-                </button>
+                <div className="fileActions">
+                  <button className="smallButton" onClick={() => renameFile(file)} title="Переименовать">
+                    Rename
+                  </button>
+                  <button className="smallButton danger" onClick={() => deleteFile(file)} title="Удалить">
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </aside>
 
         <section className="editorPane">
-          <div className="editorTitle">{activeFile?.name || 'Файл не выбран'}</div>
+          <div className="editorTitle">
+            <div className="editorTitleMain">
+              <span className="editorDot" />
+              <span>{activeFile?.name || 'Файл не выбран'}</span>
+            </div>
+            <span className="shortcutHint">Ctrl Enter</span>
+          </div>
           <Editor
             theme={theme === 'dark' ? 'vs-dark' : 'light'}
             options={{ minimap: { enabled: false }, fontSize: 14, tabSize: 4, automaticLayout: true }}
@@ -339,20 +363,52 @@ export function RoomPage() {
         </section>
 
         <aside className="outputPane">
-          <div className="panelHeader">
-            <h2>Запуск</h2>
-            <button className="primaryButton" onClick={runCode} disabled={!activeFile || runResult.status === 'running'}>
-              {runResult.status === 'running' ? 'Выполняется' : 'Запустить'}
-            </button>
-          </div>
-          <div className={`status status-${runResult.status}`}>
-            {runResult.status === 'idle' && 'Не запускалось'}
-            {runResult.status === 'running' && 'Выполняется'}
-            {runResult.status === 'success' && 'Успешно завершено'}
-            {runResult.status === 'error' && 'Ошибка'}
-          </div>
-          <pre className="output">{runResult.stdout || runResult.stderr ? `${runResult.stdout}${runResult.stderr}` : 'Вывод появится здесь.'}</pre>
-          <div className="muted">exitCode: {runResult.exitCode ?? 'null'}</div>
+          <section className="sidePanel">
+            <div className="panelHeader">
+              <div>
+                <span className="sectionLabel">Presence</span>
+                <h2>Участники</h2>
+              </div>
+              <span className="countBadge">{room?.users.length || 0}</span>
+            </div>
+            <div className="users">
+              {room?.users.length ? (
+                room.users.map((user) => (
+                  <span className="userPill" key={user.clientId} style={{ borderColor: user.color }}>
+                    <span className="dot" style={{ background: user.color }} />
+                    {user.name}
+                  </span>
+                ))
+              ) : (
+                <div className="emptyState">Пока никого нет в комнате.</div>
+              )}
+            </div>
+          </section>
+
+          <section className="sidePanel runPanel">
+            <div className="panelHeader">
+              <div>
+                <span className="sectionLabel">Python runner</span>
+                <h2>Запуск</h2>
+              </div>
+              <button
+                className={`primaryButton runButton ${runResult.status === 'running' ? 'stopButton' : ''}`}
+                onClick={runResult.status === 'running' ? stopCode : runCode}
+                disabled={!activeFile}
+              >
+                {runResult.status === 'running' ? 'Stop' : 'Run'}
+              </button>
+            </div>
+            <div className={`status status-${runResult.status}`}>
+              {runResult.status === 'idle' && 'Не запускалось'}
+              {runResult.status === 'running' && 'Выполняется'}
+              {runResult.status === 'success' && 'Успешно завершено'}
+              {runResult.status === 'error' && 'Ошибка'}
+              {runResult.status === 'stopped' && 'Остановлено'}
+            </div>
+            <pre className="output">{runResult.stdout || runResult.stderr ? `${runResult.stdout}${runResult.stderr}` : 'Вывод появится здесь.'}</pre>
+            <div className="exitCode">exitCode: {runResult.exitCode ?? 'null'}</div>
+          </section>
         </aside>
       </section>
     </main>

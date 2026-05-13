@@ -29,14 +29,39 @@ export function HomePage() {
         <ThemeToggle />
       </div>
       <section className="homePanel">
-        <div className="brandMark">CC</div>
-        <p className="eyebrow">Python classroom</p>
-        <h1>Collab Code Platform</h1>
-        <p className="homeText">Совместное написание и запуск Python-кода в учебной комнате.</p>
-        <button className="primaryButton" onClick={createRoom} disabled={creating}>
-          {creating ? 'Создание...' : 'Создать комнату'}
-        </button>
-        {error && <div className="errorBox">{error}</div>}
+        <div className="homeHero">
+          <div className="brandMark">CC</div>
+          <p className="eyebrow">Collaborative Python workspace</p>
+          <h1>Collab Code Platform</h1>
+          <p className="homeText">Комната для совместного кода, файлов, запуска Python и общего вывода результата.</p>
+          <div className="homeActions">
+            <button className="primaryButton largeButton" onClick={createRoom} disabled={creating}>
+              {creating ? 'Создание...' : 'Создать комнату'}
+            </button>
+          </div>
+          {error && <div className="errorBox">{error}</div>}
+        </div>
+        <div className="homePreview" aria-hidden="true">
+          <div className="previewTop">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="previewBody">
+            <div className="previewSidebar">
+              <span className="previewFile active" />
+              <span className="previewFile" />
+              <span className="previewFile short" />
+            </div>
+            <div className="previewEditor">
+              <span />
+              <span />
+              <span className="wide" />
+              <span />
+              <span className="accent" />
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   );

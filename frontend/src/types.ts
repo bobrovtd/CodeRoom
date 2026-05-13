@@ -14,7 +14,7 @@ export type User = {
 };
 
 export type RunResult = {
-  status: 'idle' | 'running' | 'success' | 'error';
+  status: 'idle' | 'running' | 'success' | 'error' | 'stopped';
   stdout: string;
   stderr: string;
   exitCode: number | null;

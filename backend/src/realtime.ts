@@ -23,6 +23,7 @@ import { runPythonFile } from './runner.js';
 
 const messageSync = 0;
 const messageAwareness = 1;
+const activeRuns = new Map<string, AbortController>();
 
 type YRoom = {
   doc: Y.Doc;
@@ -122,6 +123,16 @@ export function attachRealtime(server: Server) {
 
         if (message.type === 'runCode') {
           await runAndBroadcast(room, message.fileId);
+          return;
+        }
+
+        if (message.type === 'stopCode') {
+          const controller = activeRuns.get(room.roomId);
+          if (!controller) {
+            send(ws, { type: 'error', message: 'Код сейчас не выполняется' });
+            return;
+          }
+          controller.abort();
         }
       } catch (error) {
         send(ws, { type: 'error', message: error instanceof Error ? error.message : 'Неизвестная ошибка' });
@@ -145,6 +156,8 @@ export function attachRealtime(server: Server) {
 }
 
 export async function runAndBroadcast(room: Room, fileId: string) {
+  if (activeRuns.has(room.roomId)) throw new Error('Код уже выполняется');
+
   const file = room.files.find((item) => item.id === fileId);
   if (!file) throw new Error('Файл не найден');
   if (file.language !== 'python') throw new Error('Можно запускать только Python-файлы');
@@ -157,10 +170,17 @@ export async function runAndBroadcast(room: Room, fileId: string) {
     name: item.name,
     content: doc.getText(`file:${item.id}`).toString()
   }));
-  const result = await runPythonFile(file.name, files);
-  room.lastRun = result;
-  broadcast(room, { type: 'runFinished', result });
-  return result;
+  const controller = new AbortController();
+  activeRuns.set(room.roomId, controller);
+
+  try {
+    const result = await runPythonFile(file.name, files, { signal: controller.signal });
+    room.lastRun = result;
+    broadcast(room, { type: 'runFinished', result });
+    return result;
+  } finally {
+    if (activeRuns.get(room.roomId) === controller) activeRuns.delete(room.roomId);
+  }
 }
 
 function getYRoom(roomId: string): YRoom {

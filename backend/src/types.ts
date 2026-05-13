@@ -14,7 +14,7 @@ export type User = {
 };
 
 export type RunResult = {
-  status: 'idle' | 'running' | 'success' | 'error';
+  status: 'idle' | 'running' | 'success' | 'error' | 'stopped';
   stdout: string;
   stderr: string;
   exitCode: number | null;
@@ -39,4 +39,5 @@ export type ClientMessage =
   | { type: 'renameFile'; roomId: string; fileId: string; name: string }
   | { type: 'deleteFile'; roomId: string; fileId: string }
   | { type: 'selectFile'; roomId: string; fileId: string }
-  | { type: 'runCode'; roomId: string; fileId: string };
+  | { type: 'runCode'; roomId: string; fileId: string }
+  | { type: 'stopCode'; roomId: string };

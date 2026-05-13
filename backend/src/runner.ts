@@ -4,7 +4,8 @@ import type { RunResult } from './types.js';
 
 const RUNNER_IMAGE = process.env.RUNNER_IMAGE || 'collab-python-runner';
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || (process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock');
-const TIMEOUT_MS = 5000;
+const TIMEOUT_MS = Number(process.env.RUN_TIMEOUT_MS || 5000);
+const MAX_OUTPUT_BYTES = Number(process.env.RUN_OUTPUT_LIMIT_BYTES || 64 * 1024);
 
 type DockerCreateResponse = {
   Id: string;
@@ -18,6 +19,37 @@ export type RunnerFile = {
   name: string;
   content: string;
 };
+
+type StopReason = 'timeout' | 'output-limit' | 'stopped';
+
+type RunOptions = {
+  signal?: AbortSignal;
+};
+
+class OutputCollector {
+  private stdoutChunks: Buffer[] = [];
+  private stderrChunks: Buffer[] = [];
+  private totalBytes = 0;
+
+  append(stream: 'stdout' | 'stderr', chunk: Buffer) {
+    const remaining = MAX_OUTPUT_BYTES - this.totalBytes;
+    if (remaining <= 0) return false;
+
+    const accepted = chunk.byteLength > remaining ? chunk.subarray(0, remaining) : chunk;
+    this.totalBytes += accepted.byteLength;
+    if (stream === 'stderr') this.stderrChunks.push(accepted);
+    else this.stdoutChunks.push(accepted);
+
+    return chunk.byteLength <= remaining;
+  }
+
+  getOutput() {
+    return {
+      stdout: Buffer.concat(this.stdoutChunks).toString('utf8'),
+      stderr: Buffer.concat(this.stderrChunks).toString('utf8')
+    };
+  }
+}
 
 function dockerRequest(method: string, path: string, body?: Buffer | object, contentType = 'application/json') {
   const payload = Buffer.isBuffer(body) ? body : body ? Buffer.from(JSON.stringify(body)) : undefined;
@@ -56,6 +88,56 @@ function dockerRequest(method: string, path: string, body?: Buffer | object, con
     if (payload) request.write(payload);
     request.end();
   });
+}
+
+function attachContainerLogs(containerId: string, output: OutputCollector, onLimitExceeded: () => void) {
+  let pending = Buffer.alloc(0);
+  let limitExceeded = false;
+  let request: http.ClientRequest;
+
+  const finished = new Promise<void>((resolve, reject) => {
+    request = http.request(
+      {
+        socketPath: DOCKER_SOCKET,
+        path: `/containers/${containerId}/attach?stream=1&stdout=1&stderr=1`,
+        method: 'POST',
+        headers: {
+          Host: 'docker'
+        }
+      },
+      (response) => {
+        response.on('data', (chunk: Buffer) => {
+          pending = Buffer.concat([pending, chunk]);
+
+          while (pending.length >= 8) {
+            const streamType = pending[0];
+            const size = pending.readUInt32BE(4);
+            if (pending.length < 8 + size) break;
+
+            const payload = pending.subarray(8, 8 + size);
+            pending = pending.subarray(8 + size);
+
+            const stream = streamType === 2 ? 'stderr' : 'stdout';
+            if (!output.append(stream, payload) && !limitExceeded) {
+              limitExceeded = true;
+              onLimitExceeded();
+            }
+          }
+        });
+        response.on('end', resolve);
+        response.on('close', resolve);
+        response.on('error', reject);
+      }
+    );
+
+    request.on('error', reject);
+    request.end();
+  });
+
+  return {
+    finished,
+    close: () => request.destroy()
+  };
 }
 
 function parseJson<T>(data: Buffer): T {
@@ -106,28 +188,6 @@ function createTarArchive(files: RunnerFile[]) {
   return Buffer.concat([...entries, Buffer.alloc(1024, 0)]);
 }
 
-function parseDockerLogs(data: Buffer) {
-  let offset = 0;
-  let stdout = '';
-  let stderr = '';
-
-  while (offset + 8 <= data.length) {
-    const stream = data[offset];
-    const size = data.readUInt32BE(offset + 4);
-    const start = offset + 8;
-    const end = start + size;
-    if (end > data.length) break;
-
-    const text = data.subarray(start, end).toString('utf8');
-    if (stream === 2) stderr += text;
-    else stdout += text;
-    offset = end;
-  }
-
-  if (offset === 0 && data.length > 0) stdout = data.toString('utf8');
-  return { stdout, stderr };
-}
-
 async function killContainer(id: string) {
   try {
     await dockerRequest('POST', `/containers/${id}/kill`);
@@ -144,10 +204,30 @@ async function removeContainer(id: string) {
   }
 }
 
-export async function runPythonFile(entryFileName: string, files: RunnerFile[]): Promise<RunResult> {
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function appendMessage(stderr: string, message: string) {
+  return `${stderr}${stderr ? '\n' : ''}${message}`;
+}
+
+export async function runPythonFile(entryFileName: string, files: RunnerFile[], options: RunOptions = {}): Promise<RunResult> {
   const containerName = `collab-python-${randomUUID()}`;
   let containerId = '';
-  let timedOut = false;
+  let stopReason: StopReason | null = null;
+  const output = new OutputCollector();
+  let detachLogs: (() => void) | null = null;
+  let timeout: NodeJS.Timeout | null = null;
+  let stopListener: (() => void) | null = null;
+
+  const stopContainer = async (reason: StopReason) => {
+    if (stopReason) return;
+    stopReason = reason;
+    if (containerId) await killContainer(containerId);
+  };
 
   try {
     validateArchiveFileName(entryFileName);
@@ -169,32 +249,49 @@ export async function runPythonFile(entryFileName: string, files: RunnerFile[]):
     containerId = created.Id;
 
     await dockerRequest('PUT', `/containers/${containerId}/archive?path=${encodeURIComponent('/app')}`, createTarArchive(files), 'application/x-tar');
+    const attachedLogs = attachContainerLogs(containerId, output, () => void stopContainer('output-limit'));
+    detachLogs = attachedLogs.close;
+
+    if (options.signal?.aborted) await stopContainer('stopped');
+    stopListener = () => void stopContainer('stopped');
+    options.signal?.addEventListener('abort', stopListener, { once: true });
+
     await dockerRequest('POST', `/containers/${containerId}/start`);
 
+    timeout = setTimeout(() => void stopContainer('timeout'), TIMEOUT_MS);
     const waitPromise = dockerRequest('POST', `/containers/${containerId}/wait`).then((data) => parseJson<DockerWaitResponse>(data));
-    const timeoutPromise = new Promise<null>((resolve) => {
-      setTimeout(async () => {
-        timedOut = true;
-        await killContainer(containerId);
-        resolve(null);
-      }, TIMEOUT_MS);
-    });
+    const waitResult = await waitPromise;
+    await Promise.race([attachedLogs.finished.catch(() => undefined), delay(1000)]);
+    const logs = output.getOutput();
 
-    const waitResult = await Promise.race([waitPromise, timeoutPromise]);
-    if (timedOut) await waitPromise.catch(() => undefined);
-
-    const logs = parseDockerLogs(await dockerRequest('GET', `/containers/${containerId}/logs?stdout=1&stderr=1`));
-
-    if (timedOut) {
+    const exitCode = waitResult?.StatusCode ?? null;
+    if (stopReason === 'stopped') {
       return {
-        status: 'error',
+        status: 'stopped',
         stdout: logs.stdout,
-        stderr: `${logs.stderr}${logs.stderr ? '\n' : ''}Timeout: выполнение остановлено через 5 секунд`,
+        stderr: appendMessage(logs.stderr, 'Execution stopped by user'),
         exitCode: null
       };
     }
 
-    const exitCode = waitResult?.StatusCode ?? null;
+    if (stopReason === 'timeout') {
+      return {
+        status: 'error',
+        stdout: logs.stdout,
+        stderr: appendMessage(logs.stderr, `Timeout: выполнение остановлено через ${Math.round(TIMEOUT_MS / 1000)} секунд`),
+        exitCode: null
+      };
+    }
+
+    if (stopReason === 'output-limit') {
+      return {
+        status: 'error',
+        stdout: logs.stdout,
+        stderr: appendMessage(logs.stderr, `Output limit exceeded: вывод ограничен ${Math.round(MAX_OUTPUT_BYTES / 1024)} KB`),
+        exitCode: null
+      };
+    }
+
     return {
       status: exitCode === 0 ? 'success' : 'error',
       stdout: logs.stdout,
@@ -209,6 +306,9 @@ export async function runPythonFile(entryFileName: string, files: RunnerFile[]):
       exitCode: null
     };
   } finally {
+    if (timeout) clearTimeout(timeout);
+    if (stopListener) options.signal?.removeEventListener('abort', stopListener);
+    detachLogs?.();
     if (containerId) await removeContainer(containerId);
   }
 }

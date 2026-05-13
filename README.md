@@ -131,7 +131,9 @@ collab-python-runner with network none, 128 MB memory, 0.5 CPU and 5s timeout
 - сеть в контейнере отключена;
 - память ограничена 128 MB;
 - CPU ограничен до 0.5;
-- timeout выполнения 5 секунд;
+- timeout выполнения 5 секунд (`RUN_TIMEOUT_MS`);
+- вывод stdout/stderr ограничен 64 KB (`RUN_OUTPUT_LIMIT_BYTES`);
+- выполняющийся код можно остановить из интерфейса кнопкой `Stop`;
 - в контейнер копируется только временный `main.py`;
 - контейнер удаляется после запуска.
 
