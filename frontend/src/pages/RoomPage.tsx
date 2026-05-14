@@ -462,7 +462,6 @@ export function RoomPage() {
         </div>
         <div className="topBarActions">
           <div className="topUsers" aria-label="Участники">
-            <span className="countBadge">{room?.users.length || 0}</span>
             <div className="topUsersList">
               {room?.users.map((user) => (
                 <span className="userPill compact" key={user.clientId} style={{ borderColor: user.color }}>
@@ -510,7 +509,7 @@ export function RoomPage() {
                 </button>
                 <details className="fileActions fileMenu">
                   <summary className="smallButton" aria-label={`Действия для ${file.name}`}>
-                    ...
+                    ⋮
                   </summary>
                   <div className="menuPanel fileMenuPanel">
                     <button className="menuItem" onClick={() => renameFile(file)}>
@@ -587,13 +586,6 @@ export function RoomPage() {
         <aside className="outputPane">
           <section className="sidePanel runPanel">
             <div className="panelHeader">
-              <div className={`status status-${runResult.status}`}>
-                {runResult.status === 'idle' && 'Не запускалось'}
-                {runResult.status === 'running' && 'Выполняется'}
-                {runResult.status === 'success' && 'Успешно завершено'}
-                {runResult.status === 'error' && 'Ошибка'}
-                {runResult.status === 'stopped' && 'Остановлено'}
-              </div>
               <button
                 className={`primaryButton runButton ${runResult.status === 'running' ? 'stopButton' : ''}`}
                 onClick={runResult.status === 'running' ? stopCode : runCode}
@@ -601,6 +593,13 @@ export function RoomPage() {
               >
                 {runResult.status === 'running' ? 'Stop' : 'Run'}
               </button>
+              <div className={`status status-${runResult.status}`}>
+                {runResult.status === 'idle' && 'Не запускалось'}
+                {runResult.status === 'running' && 'Выполняется'}
+                {runResult.status === 'success' && 'Успешно завершено'}
+                {runResult.status === 'error' && 'Ошибка'}
+                {runResult.status === 'stopped' && 'Остановлено'}
+              </div>
             </div>
             <pre className="output">{runResult.stdout || runResult.stderr ? `${runResult.stdout}${runResult.stderr}` : 'Вывод появится здесь.'}</pre>
             <div className="exitCode">exitCode: {runResult.exitCode ?? 'null'}</div>

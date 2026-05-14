@@ -548,6 +548,9 @@ input:focus {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .panelHeader {
