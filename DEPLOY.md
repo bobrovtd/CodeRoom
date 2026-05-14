@@ -1,6 +1,6 @@
 # Production Deploy
 
-Before a real deploy, replace `coderoom.example.com` in `docker-compose.prod.yml` with the actual domain.
+Before a real deploy, replace the local `localhost` URLs in `docker-compose.prod.yml` with the actual domain. Use `https://` for `CLIENT_ORIGIN` and `VITE_API_URL`, and `wss://` for `VITE_WS_URL` when HTTPS is enabled.
 
 Build the Python runner image:
 

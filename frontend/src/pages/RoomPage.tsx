@@ -197,11 +197,34 @@ export function RoomPage() {
       color: userColor
     });
 
+    let closedByCleanup = false;
+    let reconnectTimer: number | undefined;
+    let reconnectAttempt = 0;
+    const yjsConnectionError = 'Editor WebSocket is not connected. Check VITE_WS_URL and the ws/wss protocol.';
+    const syncTimeout = window.setTimeout(() => {
+      if (!closedByCleanup && !provider.synced) setError(yjsConnectionError);
+    }, 5000);
+
     const handleProviderSync = (isSynced: boolean) => {
-      if (isSynced) setInitialSyncComplete(true);
+      if (isSynced) {
+        window.clearTimeout(syncTimeout);
+        setInitialSyncComplete(true);
+        setError((current) => (current === yjsConnectionError ? '' : current));
+      }
     };
 
     provider.on('sync', handleProviderSync);
+
+    const handleProviderStatus = ({ status }: { status: 'connected' | 'disconnected' | 'connecting' }) => {
+      if (status === 'connected') {
+        setError((current) => (current === yjsConnectionError ? '' : current));
+      }
+      if (status === 'disconnected' && !closedByCleanup && !provider.synced) {
+        setError(yjsConnectionError);
+      }
+    };
+
+    provider.on('status', handleProviderStatus);
 
     const styleElement = document.createElement('style');
     styleElement.dataset.roomRemoteSelections = roomId;
@@ -230,10 +253,6 @@ export function RoomPage() {
 
     provider.awareness.on('change', updateRemoteSelectionStyles);
     updateRemoteSelectionStyles();
-
-    let closedByCleanup = false;
-    let reconnectTimer: number | undefined;
-    let reconnectAttempt = 0;
 
     const connectApiSocket = () => {
       const ws = new WebSocket(`${WS_URL}/ws`);
@@ -280,12 +299,14 @@ export function RoomPage() {
     return () => {
       closedByCleanup = true;
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      window.clearTimeout(syncTimeout);
       const ws = wsRef.current;
       if (ws?.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'leaveRoom', roomId, clientId }));
       }
       ws?.close();
       provider.off('sync', handleProviderSync);
+      provider.off('status', handleProviderStatus);
       provider.awareness.off('change', updateRemoteSelectionStyles);
       bindingRef.current?.destroy();
       modelRef.current?.dispose();
