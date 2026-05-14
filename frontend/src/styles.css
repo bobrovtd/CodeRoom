@@ -393,33 +393,6 @@ input:focus {
   font-size: 15px;
 }
 
-.connection {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--success);
-  background: var(--success-bg);
-  border: 1px solid color-mix(in srgb, var(--success) 28%, transparent);
-  border-radius: 999px;
-  padding: 8px 11px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.connection.offline {
-  color: var(--danger);
-  background: var(--danger-bg);
-  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
-}
-
-.connectionDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 18px currentColor;
-}
-
 .workspace {
   flex: 1;
   min-height: 0;
@@ -634,17 +607,6 @@ input:focus {
   background: var(--success);
   box-shadow: 0 0 18px var(--success);
   flex: 0 0 auto;
-}
-
-.editorReadonlyNotice {
-  color: var(--warning);
-  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
-  border-radius: 999px;
-  padding: 5px 9px;
-  background: color-mix(in srgb, var(--warning) 9%, transparent);
-  font-size: 12px;
-  font-weight: 720;
-  white-space: nowrap;
 }
 
 .shortcutHint,

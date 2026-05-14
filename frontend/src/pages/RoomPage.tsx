@@ -138,9 +138,10 @@ export function RoomPage() {
   const [socketReady, setSocketReady] = useState(false);
   const [runResult, setRunResult] = useState<RunResult>(emptyRun);
   const [editorMounted, setEditorMounted] = useState(false);
-  const [yjsConnected, setYjsConnected] = useState(false);
   const [initialSyncComplete, setInitialSyncComplete] = useState(false);
   const [editorModelReady, setEditorModelReady] = useState(false);
+  const [editorModelFileId, setEditorModelFileId] = useState<string | null>(null);
+  const [firstEditorLoadComplete, setFirstEditorLoadComplete] = useState(false);
   const [editorFontSize, setEditorFontSize] = useState(getStoredEditorFontSize);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -154,9 +155,10 @@ export function RoomPage() {
   const remoteSelectionStyleRef = useRef<HTMLStyleElement | null>(null);
 
   const activeFile = room?.files.find((file) => file.id === room.activeFileId) || null;
-  const editorReady = Boolean(activeFile && socketReady && yjsConnected && initialSyncComplete && editorModelReady);
-  const showEditorLoading = Boolean(joinedName && activeFile && (!initialSyncComplete || !editorModelReady));
-  const showEditorReadonlyNotice = Boolean(joinedName && activeFile && initialSyncComplete && editorModelReady && !editorReady);
+  const activeModelReady = Boolean(activeFile && editorModelReady && editorModelFileId === activeFile.id);
+  const editorReady = Boolean(activeFile && initialSyncComplete && activeModelReady);
+  const runReady = Boolean(activeFile && activeModelReady && socketReady);
+  const showEditorLoading = Boolean(joinedName && activeFile && !firstEditorLoadComplete && (!initialSyncComplete || !editorModelReady));
 
   useEffect(() => {
     let cancelled = false;
@@ -186,9 +188,10 @@ export function RoomPage() {
     const provider = new WebsocketProvider(`${WS_URL}/yjs`, roomId, ydoc, { connect: true });
     ydocRef.current = ydoc;
     providerRef.current = provider;
-    setYjsConnected(provider.wsconnected);
     setInitialSyncComplete(provider.synced);
     setEditorModelReady(false);
+    setEditorModelFileId(null);
+    setFirstEditorLoadComplete(false);
     provider.awareness.setLocalStateField('user', {
       name: joinedName,
       color: userColor
@@ -198,12 +201,7 @@ export function RoomPage() {
       if (isSynced) setInitialSyncComplete(true);
     };
 
-    const handleProviderStatus = ({ status }: { status: 'connected' | 'disconnected' | 'connecting' }) => {
-      setYjsConnected(status === 'connected');
-    };
-
     provider.on('sync', handleProviderSync);
-    provider.on('status', handleProviderStatus);
 
     const styleElement = document.createElement('style');
     styleElement.dataset.roomRemoteSelections = roomId;
@@ -288,7 +286,6 @@ export function RoomPage() {
       }
       ws?.close();
       provider.off('sync', handleProviderSync);
-      provider.off('status', handleProviderStatus);
       provider.awareness.off('change', updateRemoteSelectionStyles);
       bindingRef.current?.destroy();
       modelRef.current?.dispose();
@@ -301,19 +298,22 @@ export function RoomPage() {
       bindingRef.current = null;
       modelRef.current = null;
       remoteSelectionStyleRef.current = null;
-      setYjsConnected(false);
       setInitialSyncComplete(false);
       setEditorModelReady(false);
+      setEditorModelFileId(null);
+      setFirstEditorLoadComplete(false);
     };
   }, [joinedName, roomId, clientId, userColor]);
 
   useEffect(() => {
     if (!activeFile || !editorMounted || !initialSyncComplete || !editorRef.current || !monacoRef.current || !ydocRef.current || !providerRef.current) {
       setEditorModelReady(false);
+      setEditorModelFileId(null);
       return;
     }
 
     setEditorModelReady(false);
+    setEditorModelFileId(null);
     bindingRef.current?.destroy();
     modelRef.current?.dispose();
 
@@ -322,7 +322,9 @@ export function RoomPage() {
     editorRef.current.setModel(model);
     bindingRef.current = new MonacoBinding(text, model, new Set([editorRef.current]), providerRef.current.awareness);
     modelRef.current = model;
+    setEditorModelFileId(activeFile.id);
     setEditorModelReady(true);
+    setFirstEditorLoadComplete(true);
   }, [activeFile?.id, activeFile?.language, editorMounted, initialSyncComplete]);
 
   useEffect(() => {
@@ -374,9 +376,9 @@ export function RoomPage() {
   }
 
   const runCode = useCallback(() => {
-    if (!activeFile || !editorReady || runResult.status === 'running') return;
+    if (!activeFile || !runReady || runResult.status === 'running') return;
     send({ type: 'runCode', fileId: activeFile.id, content: modelRef.current?.getValue() ?? '' });
-  }, [activeFile, editorReady, runResult.status]);
+  }, [activeFile, runReady, runResult.status]);
 
   function stopCode() {
     if (runResult.status !== 'running') return;
@@ -463,10 +465,6 @@ export function RoomPage() {
             Скопировать ссылку
           </button>
           <ThemeToggle />
-          <div className={`connection ${socketReady ? 'online' : 'offline'}`}>
-            <span className="connectionDot" />
-            {socketReady ? 'Подключено' : 'Отключено'}
-          </div>
         </div>
       </header>
 
@@ -514,7 +512,6 @@ export function RoomPage() {
               <span>{activeFile?.name || 'Файл не выбран'}</span>
             </div>
             <div className="editorTools">
-              {showEditorReadonlyNotice && <span className="editorReadonlyNotice">Только чтение: нет связи</span>}
               <div className="fontSizeControl" aria-label="Размер шрифта редактора">
                 <button type="button" onClick={() => changeEditorFontSize(-1)} disabled={editorFontSize <= minEditorFontSize}>
                   A-
@@ -596,7 +593,7 @@ export function RoomPage() {
               <button
                 className={`primaryButton runButton ${runResult.status === 'running' ? 'stopButton' : ''}`}
                 onClick={runResult.status === 'running' ? stopCode : runCode}
-                disabled={runResult.status !== 'running' && (!activeFile || !editorReady)}
+                disabled={runResult.status !== 'running' && !runReady}
               >
                 {runResult.status === 'running' ? 'Stop' : 'Run'}
               </button>
