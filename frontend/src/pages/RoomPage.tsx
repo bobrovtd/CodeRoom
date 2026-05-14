@@ -219,9 +219,6 @@ export function RoomPage() {
       if (status === 'connected') {
         setError((current) => (current === yjsConnectionError ? '' : current));
       }
-      if (status === 'disconnected' && !closedByCleanup && !provider.synced) {
-        setError(yjsConnectionError);
-      }
     };
 
     provider.on('status', handleProviderStatus);
