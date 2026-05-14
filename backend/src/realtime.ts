@@ -122,7 +122,7 @@ export function attachRealtime(server: Server) {
         }
 
         if (message.type === 'runCode') {
-          await runAndBroadcast(room, message.fileId);
+          await runAndBroadcast(room, message.fileId, typeof message.content === 'string' ? message.content : undefined);
           return;
         }
 
@@ -155,7 +155,7 @@ export function attachRealtime(server: Server) {
   });
 }
 
-export async function runAndBroadcast(room: Room, fileId: string) {
+export async function runAndBroadcast(room: Room, fileId: string, contentOverride?: string) {
   if (activeRuns.has(room.roomId)) throw new Error('Код уже выполняется');
 
   const file = room.files.find((item) => item.id === fileId);
@@ -168,7 +168,7 @@ export async function runAndBroadcast(room: Room, fileId: string) {
   const doc = getRoomDoc(room.roomId);
   const files = room.files.map((item) => ({
     name: item.name,
-    content: doc.getText(`file:${item.id}`).toString()
+    content: item.id === fileId && contentOverride !== undefined ? contentOverride : doc.getText(`file:${item.id}`).toString()
   }));
   const controller = new AbortController();
   activeRuns.set(room.roomId, controller);

@@ -138,6 +138,9 @@ export function RoomPage() {
   const [socketReady, setSocketReady] = useState(false);
   const [runResult, setRunResult] = useState<RunResult>(emptyRun);
   const [editorMounted, setEditorMounted] = useState(false);
+  const [yjsConnected, setYjsConnected] = useState(false);
+  const [initialSyncComplete, setInitialSyncComplete] = useState(false);
+  const [editorModelReady, setEditorModelReady] = useState(false);
   const [editorFontSize, setEditorFontSize] = useState(getStoredEditorFontSize);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -151,6 +154,9 @@ export function RoomPage() {
   const remoteSelectionStyleRef = useRef<HTMLStyleElement | null>(null);
 
   const activeFile = room?.files.find((file) => file.id === room.activeFileId) || null;
+  const editorReady = Boolean(activeFile && socketReady && yjsConnected && initialSyncComplete && editorModelReady);
+  const showEditorLoading = Boolean(joinedName && activeFile && (!initialSyncComplete || !editorModelReady));
+  const showEditorReadonlyNotice = Boolean(joinedName && activeFile && initialSyncComplete && editorModelReady && !editorReady);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,10 +186,24 @@ export function RoomPage() {
     const provider = new WebsocketProvider(`${WS_URL}/yjs`, roomId, ydoc, { connect: true });
     ydocRef.current = ydoc;
     providerRef.current = provider;
+    setYjsConnected(provider.wsconnected);
+    setInitialSyncComplete(provider.synced);
+    setEditorModelReady(false);
     provider.awareness.setLocalStateField('user', {
       name: joinedName,
       color: userColor
     });
+
+    const handleProviderSync = (isSynced: boolean) => {
+      if (isSynced) setInitialSyncComplete(true);
+    };
+
+    const handleProviderStatus = ({ status }: { status: 'connected' | 'disconnected' | 'connecting' }) => {
+      setYjsConnected(status === 'connected');
+    };
+
+    provider.on('sync', handleProviderSync);
+    provider.on('status', handleProviderStatus);
 
     const styleElement = document.createElement('style');
     styleElement.dataset.roomRemoteSelections = roomId;
@@ -213,40 +233,62 @@ export function RoomPage() {
     provider.awareness.on('change', updateRemoteSelectionStyles);
     updateRemoteSelectionStyles();
 
-    const ws = new WebSocket(`${WS_URL}/ws`);
-    wsRef.current = ws;
+    let closedByCleanup = false;
+    let reconnectTimer: number | undefined;
+    let reconnectAttempt = 0;
 
-    ws.onopen = () => {
-      setSocketReady(true);
-      ws.send(JSON.stringify({ type: 'joinRoom', roomId, clientId, name: joinedName, color: userColor }));
+    const connectApiSocket = () => {
+      const ws = new WebSocket(`${WS_URL}/ws`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        reconnectAttempt = 0;
+        setSocketReady(true);
+        ws.send(JSON.stringify({ type: 'joinRoom', roomId, clientId, name: joinedName, color: userColor }));
+      };
+
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data) as ServerMessage;
+        if (message.type === 'roomState') {
+          setRoom(message.room);
+          setRunResult(message.room.lastRun);
+        }
+        if (message.type === 'usersUpdated') setRoom((prev) => (prev ? { ...prev, users: message.users } : prev));
+        if (message.type === 'filesUpdated') setRoom((prev) => (prev ? { ...prev, files: message.files } : prev));
+        if (message.type === 'activeFileUpdated') setRoom((prev) => (prev ? { ...prev, activeFileId: message.activeFileId } : prev));
+        if (message.type === 'runStarted' || message.type === 'runFinished') setRunResult(message.result);
+        if (message.type === 'error') setError(message.message);
+      };
+
+      ws.onclose = () => {
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+          setSocketReady(false);
+        }
+
+        if (closedByCleanup) return;
+        const delay = Math.min(4000, 500 * 2 ** reconnectAttempt);
+        reconnectAttempt += 1;
+        reconnectTimer = window.setTimeout(connectApiSocket, delay);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
     };
 
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data) as ServerMessage;
-      if (message.type === 'roomState') {
-        setRoom(message.room);
-        setRunResult(message.room.lastRun);
-      }
-      if (message.type === 'usersUpdated') setRoom((prev) => (prev ? { ...prev, users: message.users } : prev));
-      if (message.type === 'filesUpdated') setRoom((prev) => (prev ? { ...prev, files: message.files } : prev));
-      if (message.type === 'activeFileUpdated') setRoom((prev) => (prev ? { ...prev, activeFileId: message.activeFileId } : prev));
-      if (message.type === 'runStarted' || message.type === 'runFinished') setRunResult(message.result);
-      if (message.type === 'error') setError(message.message);
-    };
-
-    ws.onclose = () => {
-      setSocketReady(false);
-    };
-
-    ws.onerror = () => {
-      setError('Ошибка WebSocket подключения');
-    };
+    connectApiSocket();
 
     return () => {
-      if (ws.readyState === WebSocket.OPEN) {
+      closedByCleanup = true;
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      const ws = wsRef.current;
+      if (ws?.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'leaveRoom', roomId, clientId }));
       }
-      ws.close();
+      ws?.close();
+      provider.off('sync', handleProviderSync);
+      provider.off('status', handleProviderStatus);
       provider.awareness.off('change', updateRemoteSelectionStyles);
       bindingRef.current?.destroy();
       modelRef.current?.dispose();
@@ -259,12 +301,19 @@ export function RoomPage() {
       bindingRef.current = null;
       modelRef.current = null;
       remoteSelectionStyleRef.current = null;
+      setYjsConnected(false);
+      setInitialSyncComplete(false);
+      setEditorModelReady(false);
     };
   }, [joinedName, roomId, clientId, userColor]);
 
   useEffect(() => {
-    if (!activeFile || !editorMounted || !editorRef.current || !monacoRef.current || !ydocRef.current || !providerRef.current) return;
+    if (!activeFile || !editorMounted || !initialSyncComplete || !editorRef.current || !monacoRef.current || !ydocRef.current || !providerRef.current) {
+      setEditorModelReady(false);
+      return;
+    }
 
+    setEditorModelReady(false);
     bindingRef.current?.destroy();
     modelRef.current?.dispose();
 
@@ -273,7 +322,8 @@ export function RoomPage() {
     editorRef.current.setModel(model);
     bindingRef.current = new MonacoBinding(text, model, new Set([editorRef.current]), providerRef.current.awareness);
     modelRef.current = model;
-  }, [activeFile?.id, activeFile?.language, editorMounted]);
+    setEditorModelReady(true);
+  }, [activeFile?.id, activeFile?.language, editorMounted, initialSyncComplete]);
 
   useEffect(() => {
     if (!monacoRef.current) return;
@@ -324,9 +374,9 @@ export function RoomPage() {
   }
 
   const runCode = useCallback(() => {
-    if (!activeFile || runResult.status === 'running') return;
-    send({ type: 'runCode', fileId: activeFile.id });
-  }, [activeFile, runResult.status]);
+    if (!activeFile || !editorReady || runResult.status === 'running') return;
+    send({ type: 'runCode', fileId: activeFile.id, content: modelRef.current?.getValue() ?? '' });
+  }, [activeFile, editorReady, runResult.status]);
 
   function stopCode() {
     if (runResult.status !== 'running') return;
@@ -431,8 +481,7 @@ export function RoomPage() {
         <aside className="sidebar">
           <div className="panelHeader">
             <div>
-              <span className="sectionLabel">Workspace</span>
-              <h2>Файлы</h2>
+              <span className="sectionLabel">Файлы</span>
             </div>
             <button className="iconTextButton" onClick={createFile}>
               + Файл
@@ -465,6 +514,7 @@ export function RoomPage() {
               <span>{activeFile?.name || 'Файл не выбран'}</span>
             </div>
             <div className="editorTools">
+              {showEditorReadonlyNotice && <span className="editorReadonlyNotice">Только чтение: нет связи</span>}
               <div className="fontSizeControl" aria-label="Размер шрифта редактора">
                 <button type="button" onClick={() => changeEditorFontSize(-1)} disabled={editorFontSize <= minEditorFontSize}>
                   A-
@@ -477,42 +527,50 @@ export function RoomPage() {
               <span className="shortcutHint">Ctrl Enter</span>
             </div>
           </div>
-          <Editor
-            theme={getEditorThemeName(theme)}
-            beforeMount={handleEditorBeforeMount}
-            options={{
-              minimap: { enabled: false },
-              fontSize: editorFontSize,
-              lineHeight: Math.round(editorFontSize * 1.65),
-              fontFamily: '"Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace',
-              fontLigatures: true,
-              tabSize: 4,
-              automaticLayout: true,
-              scrollBeyondLastLine: false,
-              smoothScrolling: true,
-              cursorBlinking: 'smooth',
-              cursorSmoothCaretAnimation: 'on',
-              renderLineHighlight: 'all',
-              overviewRulerBorder: false,
-              padding: { top: 18, bottom: 18 },
-              bracketPairColorization: { enabled: true },
-              guides: { bracketPairs: true, indentation: true },
-              scrollbar: {
-                verticalScrollbarSize: 10,
-                horizontalScrollbarSize: 10,
-                useShadows: false
-              }
-            }}
-            onMount={handleEditorMount}
-          />
+          <div className="editorShell">
+            <Editor
+              theme={getEditorThemeName(theme)}
+              beforeMount={handleEditorBeforeMount}
+              options={{
+                readOnly: !editorReady,
+                minimap: { enabled: false },
+                fontSize: editorFontSize,
+                lineHeight: Math.round(editorFontSize * 1.65),
+                fontFamily: '"Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace',
+                fontLigatures: true,
+                tabSize: 4,
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                smoothScrolling: true,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
+                renderLineHighlight: 'all',
+                overviewRulerBorder: false,
+                padding: { top: 18, bottom: 18 },
+                bracketPairColorization: { enabled: true },
+                guides: { bracketPairs: true, indentation: true },
+                scrollbar: {
+                  verticalScrollbarSize: 10,
+                  horizontalScrollbarSize: 10,
+                  useShadows: false
+                }
+              }}
+              onMount={handleEditorMount}
+            />
+            {showEditorLoading && (
+              <div className="editorLoadingOverlay" aria-live="polite">
+                <div className="editorSpinner" />
+                <span>Подключение редактора</span>
+              </div>
+            )}
+          </div>
         </section>
 
         <aside className="outputPane">
           <section className="sidePanel">
             <div className="panelHeader">
               <div>
-                <span className="sectionLabel">Presence</span>
-                <h2>Участники</h2>
+                <span className="sectionLabel">Участники</span>
               </div>
               <span className="countBadge">{room?.users.length || 0}</span>
             </div>
@@ -533,13 +591,12 @@ export function RoomPage() {
           <section className="sidePanel runPanel">
             <div className="panelHeader">
               <div>
-                <span className="sectionLabel">Python runner</span>
-                <h2>Запуск</h2>
+                <span className="sectionLabel">Вывод</span>
               </div>
               <button
                 className={`primaryButton runButton ${runResult.status === 'running' ? 'stopButton' : ''}`}
                 onClick={runResult.status === 'running' ? stopCode : runCode}
-                disabled={!activeFile}
+                disabled={runResult.status !== 'running' && (!activeFile || !editorReady)}
               >
                 {runResult.status === 'running' ? 'Stop' : 'Run'}
               </button>

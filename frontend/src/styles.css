@@ -636,6 +636,17 @@ input:focus {
   flex: 0 0 auto;
 }
 
+.editorReadonlyNotice {
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: color-mix(in srgb, var(--warning) 9%, transparent);
+  font-size: 12px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
 .shortcutHint,
 .exitCode {
   color: var(--text-muted);
@@ -700,12 +711,24 @@ input:focus {
   background: rgb(255 255 255 / 0.035);
 }
 
+.editorShell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
 .editorPane > section,
+.editorShell > section,
 .editorPane .monaco-editor {
   min-height: 0;
 }
 
-.editorPane > section {
+.editorShell > section {
+  height: 100% !important;
+}
+
+.editorPane > section,
+.editorShell > section {
   background: transparent !important;
 }
 
@@ -721,6 +744,39 @@ input:focus {
 
 .editorPane .monaco-editor .view-overlays .current-line {
   border-radius: 8px;
+}
+
+.editorLoadingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  color: var(--text-soft);
+  background:
+    radial-gradient(circle at 50% 42%, rgb(124 92 255 / 0.16), transparent 14rem),
+    color-mix(in srgb, var(--editor-bg) 82%, transparent);
+  backdrop-filter: blur(2px);
+  font-size: 13px;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+.editorSpinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--text-muted) 28%, transparent);
+  border-top-color: var(--cyan);
+  animation: editorSpin 780ms linear infinite;
+}
+
+@keyframes editorSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .yRemoteSelection {

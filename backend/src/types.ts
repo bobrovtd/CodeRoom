@@ -39,5 +39,5 @@ export type ClientMessage =
   | { type: 'renameFile'; roomId: string; fileId: string; name: string }
   | { type: 'deleteFile'; roomId: string; fileId: string }
   | { type: 'selectFile'; roomId: string; fileId: string }
-  | { type: 'runCode'; roomId: string; fileId: string }
+  | { type: 'runCode'; roomId: string; fileId: string; content?: string }
   | { type: 'stopCode'; roomId: string };
