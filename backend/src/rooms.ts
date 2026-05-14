@@ -5,6 +5,10 @@ import type { Room, RoomFile, RunResult, User } from './types.js';
 const rooms = new Map<string, Room>();
 const docs = new Map<string, Y.Doc>();
 const colors = ['#f97316', '#22c55e', '#38bdf8', '#a78bfa', '#f43f5e', '#eab308', '#14b8a6'];
+const emptyRoomTtlMs = 24 * 60 * 60 * 1000;
+const roomDeletionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+let roomDeletionHandler: ((roomId: string) => void) | null = null;
 
 const defaultRun: RunResult = {
   status: 'idle',
@@ -31,6 +35,53 @@ export function validateFileName(room: Room, name: string, ignoreFileId?: string
 
 export function getRoom(roomId: string) {
   return rooms.get(roomId);
+}
+
+export function setRoomDeletionHandler(handler: (roomId: string) => void) {
+  roomDeletionHandler = handler;
+}
+
+export function cancelRoomDeletion(roomId: string) {
+  const timer = roomDeletionTimers.get(roomId);
+  if (!timer) return;
+  clearTimeout(timer);
+  roomDeletionTimers.delete(roomId);
+}
+
+export function deleteRoom(roomId: string) {
+  const room = rooms.get(roomId);
+  if (!room) return false;
+
+  cancelRoomDeletion(roomId);
+  for (const client of room.clients.values()) {
+    client.close();
+  }
+  room.clients.clear();
+  rooms.delete(roomId);
+
+  const doc = docs.get(roomId);
+  doc?.destroy();
+  docs.delete(roomId);
+  roomDeletionHandler?.(roomId);
+  return true;
+}
+
+export function scheduleRoomDeletionIfEmpty(room: Room) {
+  if (room.users.length > 0 || room.clients.size > 0) {
+    cancelRoomDeletion(room.roomId);
+    return;
+  }
+
+  if (roomDeletionTimers.has(room.roomId)) return;
+
+  const timer = setTimeout(() => {
+    const currentRoom = rooms.get(room.roomId);
+    if (!currentRoom || currentRoom.users.length > 0 || currentRoom.clients.size > 0) return;
+    deleteRoom(room.roomId);
+  }, emptyRoomTtlMs);
+
+  timer.unref?.();
+  roomDeletionTimers.set(room.roomId, timer);
 }
 
 export function getRoomDoc(roomId: string) {
@@ -60,6 +111,7 @@ export function createRoom() {
     lastRun: { ...defaultRun }
   };
   rooms.set(roomId, room);
+  scheduleRoomDeletionIfEmpty(room);
 
   const doc = getRoomDoc(roomId);
   const text = doc.getText(`file:${fileId}`);
@@ -87,6 +139,7 @@ export function serializeFiles(room: Room) {
 }
 
 export function addUser(room: Room, user: User) {
+  cancelRoomDeletion(room.roomId);
   room.users = room.users.filter((existing) => existing.clientId !== user.clientId);
   room.users.push(user);
 }
@@ -94,6 +147,7 @@ export function addUser(room: Room, user: User) {
 export function removeUser(room: Room, clientId: string) {
   room.users = room.users.filter((user) => user.clientId !== clientId);
   room.clients.delete(clientId);
+  scheduleRoomDeletionIfEmpty(room);
 }
 
 export function nextColor(index: number) {

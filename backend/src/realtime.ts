@@ -16,7 +16,8 @@ import {
   renameFile,
   selectFile,
   serializeFiles,
-  serializeRoom
+  serializeRoom,
+  setRoomDeletionHandler
 } from './rooms.js';
 import type { ClientMessage, Room } from './types.js';
 import { runPythonFile } from './runner.js';
@@ -32,6 +33,21 @@ type YRoom = {
 };
 
 const yRooms = new Map<string, YRoom>();
+
+setRoomDeletionHandler((roomId) => {
+  const controller = activeRuns.get(roomId);
+  controller?.abort();
+  activeRuns.delete(roomId);
+
+  const yRoom = yRooms.get(roomId);
+  if (!yRoom) return;
+  for (const conn of yRoom.conns.keys()) {
+    conn.close();
+  }
+  yRoom.conns.clear();
+  yRoom.awareness.destroy();
+  yRooms.delete(roomId);
+});
 
 function send(ws: WebSocket, payload: unknown) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
