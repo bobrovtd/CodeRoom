@@ -30,10 +30,8 @@ export function HomePage() {
       </div>
       <section className="homePanel">
         <div className="homeHero">
-          <div className="brandMark">CC</div>
           <p className="eyebrow">Collaborative Python workspace</p>
-          <h1>Collab Code Platform</h1>
-          <p className="homeText">Комната для совместного кода, файлов, запуска Python и общего вывода результата.</p>
+          <h1>CodeRoom</h1>
           <div className="homeActions">
             <button className="primaryButton largeButton" onClick={createRoom} disabled={creating}>
               {creating ? 'Создание...' : 'Создать комнату'}
