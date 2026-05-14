@@ -441,7 +441,6 @@ export function RoomPage() {
       {!joinedName && (
         <div className="modalBackdrop">
           <form className="nameDialog" onSubmit={joinRoom}>
-            <div className="dialogIcon">CC</div>
             <h2>Вход в комнату</h2>
             <p className="dialogText">Введите имя, которое увидят другие участники.</p>
             <input value={nameInput} onChange={(event) => setNameInput(event.target.value)} placeholder="Ваше имя" autoFocus />
@@ -454,7 +453,6 @@ export function RoomPage() {
 
       <header className="topBar">
         <div className="roomIdentity">
-          <div className="brandMark small">CC</div>
           <div>
             <span className="muted">Комната</span>
             <strong>{roomId}</strong>
