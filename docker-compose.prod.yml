@@ -1,0 +1,29 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    expose:
+      - "4000"
+    environment:
+      - PORT=4000
+      - CLIENT_ORIGIN=https://coderoom.example.com
+      - RUNNER_IMAGE=collab-python-runner
+      - RUN_TIMEOUT_MS=5000
+      - RUN_OUTPUT_LIMIT_BYTES=65536
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_API_URL=https://coderoom.example.com
+        - VITE_WS_URL=wss://coderoom.example.com
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
