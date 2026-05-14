@@ -461,10 +461,26 @@ export function RoomPage() {
           </div>
         </div>
         <div className="topBarActions">
-          <button className="ghostButton" onClick={() => navigator.clipboard.writeText(window.location.href)}>
-            Скопировать ссылку
-          </button>
-          <ThemeToggle />
+          <div className="topUsers" aria-label="Участники">
+            <span className="countBadge">{room?.users.length || 0}</span>
+            <div className="topUsersList">
+              {room?.users.map((user) => (
+                <span className="userPill compact" key={user.clientId} style={{ borderColor: user.color }}>
+                  <span className="dot" style={{ background: user.color }} />
+                  {user.name}
+                </span>
+              ))}
+            </div>
+          </div>
+          <details className="topMenu">
+            <summary className="iconTextButton">Меню</summary>
+            <div className="menuPanel">
+              <button className="ghostButton" onClick={() => navigator.clipboard.writeText(window.location.href)}>
+                Скопировать ссылку
+              </button>
+              <ThemeToggle />
+            </div>
+          </details>
         </div>
       </header>
 
@@ -492,14 +508,19 @@ export function RoomPage() {
                   <span className="fileIcon">{file.language === 'python' ? 'PY' : 'TXT'}</span>
                   <span>{file.name}</span>
                 </button>
-                <div className="fileActions">
-                  <button className="smallButton" onClick={() => renameFile(file)} title="Переименовать">
-                    Rename
-                  </button>
-                  <button className="smallButton danger" onClick={() => deleteFile(file)} title="Удалить">
-                    Delete
-                  </button>
-                </div>
+                <details className="fileActions fileMenu">
+                  <summary className="smallButton" aria-label={`Действия для ${file.name}`}>
+                    ...
+                  </summary>
+                  <div className="menuPanel fileMenuPanel">
+                    <button className="menuItem" onClick={() => renameFile(file)}>
+                      Переименовать
+                    </button>
+                    <button className="menuItem danger" onClick={() => deleteFile(file)}>
+                      Удалить
+                    </button>
+                  </div>
+                </details>
               </div>
             ))}
           </div>
@@ -564,31 +585,14 @@ export function RoomPage() {
         </section>
 
         <aside className="outputPane">
-          <section className="sidePanel">
-            <div className="panelHeader">
-              <div>
-                <span className="sectionLabel">Участники</span>
-              </div>
-              <span className="countBadge">{room?.users.length || 0}</span>
-            </div>
-            <div className="users">
-              {room?.users.length ? (
-                room.users.map((user) => (
-                  <span className="userPill" key={user.clientId} style={{ borderColor: user.color }}>
-                    <span className="dot" style={{ background: user.color }} />
-                    {user.name}
-                  </span>
-                ))
-              ) : (
-                <div className="emptyState">Пока никого нет в комнате.</div>
-              )}
-            </div>
-          </section>
-
           <section className="sidePanel runPanel">
             <div className="panelHeader">
-              <div>
-                <span className="sectionLabel">Вывод</span>
+              <div className={`status status-${runResult.status}`}>
+                {runResult.status === 'idle' && 'Не запускалось'}
+                {runResult.status === 'running' && 'Выполняется'}
+                {runResult.status === 'success' && 'Успешно завершено'}
+                {runResult.status === 'error' && 'Ошибка'}
+                {runResult.status === 'stopped' && 'Остановлено'}
               </div>
               <button
                 className={`primaryButton runButton ${runResult.status === 'running' ? 'stopButton' : ''}`}
@@ -597,13 +601,6 @@ export function RoomPage() {
               >
                 {runResult.status === 'running' ? 'Stop' : 'Run'}
               </button>
-            </div>
-            <div className={`status status-${runResult.status}`}>
-              {runResult.status === 'idle' && 'Не запускалось'}
-              {runResult.status === 'running' && 'Выполняется'}
-              {runResult.status === 'success' && 'Успешно завершено'}
-              {runResult.status === 'error' && 'Ошибка'}
-              {runResult.status === 'stopped' && 'Остановлено'}
             </div>
             <pre className="output">{runResult.stdout || runResult.stderr ? `${runResult.stdout}${runResult.stderr}` : 'Вывод появится здесь.'}</pre>
             <div className="exitCode">exitCode: {runResult.exitCode ?? 'null'}</div>

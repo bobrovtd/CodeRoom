@@ -384,6 +384,112 @@ input:focus {
   min-width: 0;
 }
 
+.topBarActions {
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.topUsers {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topUsersList {
+  min-width: 0;
+  max-width: min(44vw, 520px);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+}
+
+.topMenu,
+.fileMenu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.topMenu summary,
+.fileMenu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.topMenu summary::-webkit-details-marker,
+.fileMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.menuPanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  min-width: 190px;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  box-shadow: 0 22px 50px rgb(0 0 0 / 0.32);
+}
+
+:root[data-theme='light'] .menuPanel {
+  background: #ffffff;
+  box-shadow: 0 22px 46px rgb(15 23 42 / 0.14);
+}
+
+.menuPanel .ghostButton,
+.menuPanel .themeToggle,
+.menuItem {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.topMenu > summary,
+.fileMenu > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: rgb(255 255 255 / 0.035);
+  color: var(--text);
+  border-radius: 14px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.topMenu > summary {
+  min-height: 38px;
+  padding: 9px 13px;
+}
+
+.fileMenu > summary {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.topMenu > summary:hover,
+.fileMenu > summary:hover,
+.topMenu[open] > summary,
+.fileMenu[open] > summary {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+:root[data-theme='light'] .topMenu > summary,
+:root[data-theme='light'] .fileMenu > summary {
+  background: rgb(15 23 42 / 0.035);
+}
+
 .topBar strong {
   display: block;
   max-width: 260px;
@@ -422,7 +528,7 @@ input:focus {
 
 .outputPane {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -546,13 +652,26 @@ input:focus {
   display: flex;
   align-items: center;
   gap: 5px;
-  opacity: 0.58;
+  opacity: 0;
   transition: opacity 160ms ease;
 }
 
 .fileItem:hover .fileActions,
-.fileItem.active .fileActions {
+.fileItem.active .fileActions,
+.fileActions[open] {
   opacity: 1;
+}
+
+.fileMenuPanel {
+  min-width: 170px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  padding: 9px 10px;
+  box-shadow: none;
 }
 
 .smallButton {
@@ -778,6 +897,12 @@ input:focus {
   white-space: nowrap;
 }
 
+.userPill.compact {
+  max-width: 150px;
+  padding: 6px 9px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
 .dot {
   width: 8px;
   height: 8px;
@@ -800,6 +925,8 @@ input:focus {
   min-height: 280px;
   white-space: pre-wrap;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
   background: #07080d;
   border: 1px solid rgb(255 255 255 / 0.08);
   border-radius: var(--radius);
@@ -810,14 +937,41 @@ input:focus {
   font-size: 13px;
 }
 
+.output::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.output::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.output::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.2);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.output::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.32);
+  background-clip: padding-box;
+}
+
+.output::-webkit-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--primary) 60%, transparent);
+  background-clip: padding-box;
+}
+
 :root[data-theme='light'] .output {
   background: #0f172a;
   color: #e2e8f0;
+  scrollbar-color: rgb(15 23 42 / 0.24) transparent;
 }
 
 .status {
   width: fit-content;
-  margin-bottom: 12px;
+  margin: 0;
   border-radius: 999px;
   padding: 7px 11px;
   font-size: 13px;
@@ -955,7 +1109,7 @@ input:focus {
 
   .outputPane {
     grid-column: 1 / -1;
-    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-columns: 1fr;
     grid-template-rows: 1fr;
   }
 
@@ -982,7 +1136,11 @@ input:focus {
 
   .topBarActions {
     width: 100%;
-    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .topUsersList {
+    max-width: none;
   }
 
   .workspace {
@@ -994,7 +1152,7 @@ input:focus {
   .outputPane {
     grid-column: auto;
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
 }
 
@@ -1030,12 +1188,13 @@ input:focus {
     padding: 10px;
   }
 
-  .fileActions {
-    display: none;
+  .fileItem {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .fileItem {
-    grid-template-columns: 1fr;
+  .fileActions {
+    justify-self: end;
+    opacity: 1;
   }
 
   .editorTitle {
