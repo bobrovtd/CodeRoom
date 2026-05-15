@@ -8,7 +8,7 @@ services:
       - "4000"
     environment:
       - PORT=4000
-      - CLIENT_ORIGIN=http://localhost
+      - CLIENT_ORIGIN=http://code-room.ru
       - RUNNER_IMAGE=collab-python-runner
       - RUN_TIMEOUT_MS=5000
       - RUN_OUTPUT_LIMIT_BYTES=65536
@@ -20,8 +20,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        - VITE_API_URL=http://localhost
-        - VITE_WS_URL=ws://localhost
+        - VITE_API_URL=http://code-room.ru
+        - VITE_WS_URL=ws://code-room.ru
     restart: unless-stopped
     ports:
       - "80:80"
