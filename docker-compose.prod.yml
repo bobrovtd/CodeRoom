@@ -24,6 +24,6 @@ services:
         - VITE_WS_URL=ws://code-room.ru
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - backend
