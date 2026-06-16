@@ -143,8 +143,18 @@ export function RoomPage() {
   const [editorModelFileId, setEditorModelFileId] = useState<string | null>(null);
   const [firstEditorLoadComplete, setFirstEditorLoadComplete] = useState(false);
   const [editorFontSize, setEditorFontSize] = useState(getStoredEditorFontSize);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('isSidebarOpen');
+    return saved !== 'false';
+  });
+
+  const toggleSidebar = (open: boolean) => {
+    setIsSidebarOpen(open);
+    localStorage.setItem('isSidebarOpen', String(open));
+  };
 
   const wsRef = useRef<WebSocket | null>(null);
+
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -153,6 +163,8 @@ export function RoomPage() {
   const bindingRef = useRef<MonacoBinding | null>(null);
   const runCodeRef = useRef<() => void>(() => {});
   const remoteSelectionStyleRef = useRef<HTMLStyleElement | null>(null);
+  const topMenuRef = useRef<HTMLDetailsElement>(null);
+
 
   const activeFile = room?.files.find((file) => file.id === room.activeFileId) || null;
   const activeModelReady = Boolean(activeFile && editorModelReady && editorModelFileId === activeFile.id);
@@ -431,6 +443,9 @@ export function RoomPage() {
     monacoRef.current = monacoInstance;
     defineEditorThemes(monacoInstance);
     monacoInstance.editor.setTheme(getEditorThemeName(theme));
+    editor.onDidFocusEditorWidget(() => {
+      topMenuRef.current?.removeAttribute('open');
+    });
     editor.addAction({
       id: 'run-code',
       label: 'Run code',
@@ -439,6 +454,7 @@ export function RoomPage() {
     });
     setEditorMounted(true);
   };
+
 
   if (!room && error) {
     return (
@@ -487,7 +503,7 @@ export function RoomPage() {
               ))}
             </div>
           </div>
-          <details className="topMenu">
+          <details className="topMenu" ref={topMenuRef}>
             <summary className="iconTextButton">Меню</summary>
             <div className="menuPanel">
               <button className="ghostButton" onClick={() => navigator.clipboard.writeText(window.location.href)}>
@@ -506,44 +522,73 @@ export function RoomPage() {
         </div>
       )}
 
-      <section className="workspace">
-        <aside className="sidebar">
-          <div className="panelHeader">
-            <div>
-              <span className="sectionLabel">Файлы</span>
-            </div>
-            <button className="iconTextButton" onClick={createFile}>
-              + Файл
-            </button>
-          </div>
-          <div className="fileList">
-            {room?.files.map((file) => (
-              <div className={`fileItem ${file.id === room.activeFileId ? 'active' : ''}`} key={file.id}>
-                <button className="fileName" onClick={() => send({ type: 'selectFile', fileId: file.id })}>
-                  <span className="fileIcon">{file.language === 'python' ? 'PY' : 'TXT'}</span>
-                  <span>{file.name}</span>
+      <section className={`workspace ${isSidebarOpen ? '' : 'sidebar-collapsed'}`}>
+        {isSidebarOpen && (
+          <aside className="sidebar">
+            <div className="panelHeader">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="sectionLabel">Файлы</span>
+                <button
+                  className="sidebarToggleButton"
+                  onClick={() => toggleSidebar(false)}
+                  title="Свернуть боковую панель"
+                  aria-label="Свернуть боковую панель"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2" />
+                    <path d="M9 3v18" />
+                    <path d="m16 15-3-3 3-3" />
+                  </svg>
                 </button>
-                <details className="fileActions fileMenu">
-                  <summary className="smallButton" aria-label={`Действия для ${file.name}`}>
-                    ⋮
-                  </summary>
-                  <div className="menuPanel fileMenuPanel">
-                    <button className="menuItem" onClick={() => renameFile(file)}>
-                      Переименовать
-                    </button>
-                    <button className="menuItem danger" onClick={() => deleteFile(file)}>
-                      Удалить
-                    </button>
-                  </div>
-                </details>
               </div>
-            ))}
-          </div>
-        </aside>
+              <button className="iconTextButton" onClick={createFile}>
+                + Файл
+              </button>
+            </div>
+            <div className="fileList">
+              {room?.files.map((file) => (
+                <div className={`fileItem ${file.id === room.activeFileId ? 'active' : ''}`} key={file.id}>
+                  <button className="fileName" onClick={() => send({ type: 'selectFile', fileId: file.id })}>
+                    <span className="fileIcon">{file.language === 'python' ? 'PY' : 'TXT'}</span>
+                    <span>{file.name}</span>
+                  </button>
+                  <details className="fileActions fileMenu">
+                    <summary className="smallButton" aria-label={`Действия для ${file.name}`}>
+                      ⋮
+                    </summary>
+                    <div className="menuPanel fileMenuPanel">
+                      <button className="menuItem" onClick={() => renameFile(file)}>
+                        Переименовать
+                      </button>
+                      <button className="menuItem danger" onClick={() => deleteFile(file)}>
+                        Удалить
+                      </button>
+                    </div>
+                  </details>
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
 
-        <section className="editorPane">
+        <section className="editorPane" onMouseEnter={() => topMenuRef.current?.removeAttribute('open')}>
           <div className="editorTitle">
             <div className="editorTitleMain">
+              {!isSidebarOpen && (
+                <button
+                  className="sidebarToggleButton"
+                  onClick={() => toggleSidebar(true)}
+                  title="Развернуть боковую панель"
+                  aria-label="Развернуть боковую панель"
+                  style={{ marginRight: '10px' }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2" />
+                    <path d="M9 3v18" />
+                    <path d="m14 9 3 3-3 3" />
+                  </svg>
+                </button>
+              )}
               <span className="editorDot" />
               <span>{activeFile?.name || 'Файл не выбран'}</span>
             </div>
@@ -557,7 +602,6 @@ export function RoomPage() {
                   A+
                 </button>
               </div>
-              <span className="shortcutHint">Ctrl Enter</span>
             </div>
           </div>
           <div className="editorShell">
@@ -567,6 +611,7 @@ export function RoomPage() {
               options={{
                 readOnly: !editorReady,
                 minimap: { enabled: false },
+                wordWrap: 'on',
                 fontSize: editorFontSize,
                 lineHeight: Math.round(editorFontSize * 1.65),
                 fontFamily: '"Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace',
@@ -606,8 +651,18 @@ export function RoomPage() {
                 className={`primaryButton runButton ${runResult.status === 'running' ? 'stopButton' : ''}`}
                 onClick={runResult.status === 'running' ? stopCode : runCode}
                 disabled={runResult.status !== 'running' && !runReady}
+                title={runResult.status === 'running' ? 'Остановить выполнение' : 'Запустить код'}
+                aria-label={runResult.status === 'running' ? 'Остановить выполнение' : 'Запустить код'}
               >
-                {runResult.status === 'running' ? 'Stop' : 'Run'}
+                {runResult.status === 'running' ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ transform: 'translateX(1px)' }}>
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
               </button>
               <div className={`status status-${runResult.status}`}>
                 {runResult.status === 'idle' && 'Не запускалось'}

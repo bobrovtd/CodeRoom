@@ -508,6 +508,11 @@ input:focus {
   padding: 12px;
 }
 
+.workspace.sidebar-collapsed {
+  grid-template-columns: minmax(380px, 1fr) 380px;
+}
+
+
 .sidebar,
 .editorPane,
 .outputPane {
@@ -559,6 +564,10 @@ input:focus {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.panelHeader .sectionLabel {
+  margin-bottom: 0;
 }
 
 .panelHeader h2 {
@@ -683,6 +692,33 @@ input:focus {
   border-radius: 11px;
 }
 
+.sidebarToggleButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 150ms ease;
+  padding: 0;
+  box-shadow: none;
+}
+
+.sidebarToggleButton:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.sidebarToggleButton svg {
+  display: block;
+}
+
+
 .danger {
   color: var(--danger);
 }
@@ -729,6 +765,7 @@ input:focus {
   background: var(--success);
   box-shadow: 0 0 18px var(--success);
   flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 .shortcutHint,
@@ -914,7 +951,24 @@ input:focus {
 }
 
 .runButton {
-  min-width: 86px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 38px;
+  padding: 0;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.runButton:not(.stopButton) {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: color-mix(in srgb, #10b981 62%, white);
+  box-shadow: 0 14px 34px rgb(16 185 129 / 0.28);
+}
+
+.runButton:not(.stopButton):hover:not(:disabled) {
+  box-shadow: 0 18px 44px rgb(16 185 129 / 0.34);
 }
 
 .stopButton {
@@ -1110,6 +1164,11 @@ input:focus {
     grid-template-rows: minmax(420px, 1fr) 320px;
   }
 
+  .workspace.sidebar-collapsed {
+    grid-template-columns: minmax(320px, 1fr);
+  }
+
+
   .outputPane {
     grid-column: 1 / -1;
     grid-template-columns: 1fr;
@@ -1152,6 +1211,11 @@ input:focus {
     padding: 10px;
   }
 
+  .workspace.sidebar-collapsed {
+    grid-template-rows: minmax(420px, 1fr) 360px;
+  }
+
+
   .outputPane {
     grid-column: auto;
     grid-template-columns: 1fr;
@@ -1185,6 +1249,11 @@ input:focus {
   .workspace {
     grid-template-rows: 180px minmax(360px, 1fr) 360px;
   }
+
+  .workspace.sidebar-collapsed {
+    grid-template-rows: minmax(360px, 1fr) 360px;
+  }
+
 
   .sidebar,
   .outputPane {
