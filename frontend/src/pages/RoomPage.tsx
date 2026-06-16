@@ -164,6 +164,7 @@ export function RoomPage() {
   const runCodeRef = useRef<() => void>(() => {});
   const remoteSelectionStyleRef = useRef<HTMLStyleElement | null>(null);
   const topMenuRef = useRef<HTMLDetailsElement>(null);
+  const cursorPositionsRef = useRef<Map<string, monaco.IPosition>>(new Map());
 
 
   const activeFile = room?.files.find((file) => file.id === room.activeFileId) || null;
@@ -342,6 +343,15 @@ export function RoomPage() {
       return;
     }
 
+    // Save previous cursor position if model was loaded
+    const prevFileId = editorModelFileId;
+    if (editorRef.current && prevFileId) {
+      const position = editorRef.current.getPosition();
+      if (position) {
+        cursorPositionsRef.current.set(prevFileId, position);
+      }
+    }
+
     setEditorModelReady(false);
     setEditorModelFileId(null);
     bindingRef.current?.destroy();
@@ -355,6 +365,13 @@ export function RoomPage() {
     setEditorModelFileId(activeFile.id);
     setEditorModelReady(true);
     setFirstEditorLoadComplete(true);
+
+    // Restore saved cursor position if it exists
+    const savedPos = cursorPositionsRef.current.get(activeFile.id);
+    if (savedPos && editorRef.current) {
+      editorRef.current.setPosition(savedPos);
+      editorRef.current.revealPositionInCenter(savedPos);
+    }
   }, [activeFile?.id, activeFile?.language, editorMounted, initialSyncComplete]);
 
   useEffect(() => {
