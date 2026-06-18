@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeRoom — Обновление системы</title>
+    <!-- Подключаем современные шрифты -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(15, 22, 38, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --glow-color: rgba(99, 102, 241, 0.15);
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-orange: #f59e0b;
+            --accent-green: #10b981;
+            --terminal-bg: #030712;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Анимированный фоновый градиент */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.04) 30%, transparent 70%);
+            animation: rotateBg 40s linear infinite;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        @keyframes rotateBg {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Декоративные фоновые элементы (код) */
+        .bg-symbols {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0.15;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .symbol {
+            position: absolute;
+            font-size: 1.5rem;
+            color: var(--primary);
+            animation: float 12s ease-in-out infinite;
+        }
+
+        .symbol:nth-child(1) { top: 15%; left: 10%; animation-delay: 0s; }
+        .symbol:nth-child(2) { top: 75%; left: 15%; animation-delay: 2s; font-size: 2rem; }
+        .symbol:nth-child(3) { top: 20%; left: 80%; animation-delay: 4s; }
+        .symbol:nth-child(4) { top: 80%; left: 75%; animation-delay: 1s; font-size: 1.8rem; }
+        .symbol:nth-child(5) { top: 45%; left: 85%; animation-delay: 5s; }
+        .symbol:nth-child(6) { top: 60%; left: 5%; animation-delay: 3s; }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.3; }
+            50% { transform: translateY(-20px) rotate(15deg); opacity: 0.8; }
+        }
+
+        /* Основной контейнер */
+        .container {
+            width: 90%;
+            max-width: 550px;
+            z-index: 2;
+            text-align: center;
+        }
+
+        /* Карточка с эффектом стекла */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 3rem 2.5rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3), 
+                        0 0 40px var(--glow-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Светящийся индикатор сверху */
+        .card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+        }
+
+        /* Анимированный логотип */
+        .logo-container {
+            margin-bottom: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .logo-ring {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px solid rgba(99, 102, 241, 0.2);
+            border-top: 2px solid var(--primary);
+            animation: spin 2s linear infinite;
+            position: absolute;
+        }
+
+        .logo-inner {
+            width: 64px;
+            height: 64px;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--primary-glow);
+            z-index: 1;
+        }
+
+        .logo-inner svg {
+            width: 30px;
+            height: 30px;
+            fill: none;
+            stroke: var(--primary);
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            animation: pulseIcon 2s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulseIcon {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 8px var(--primary)); }
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, #ffffff 40%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 2.2rem;
+            font-weight: 300;
+        }
+
+        /* Виджет терминала */
+        .terminal {
+            background-color: var(--terminal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            text-align: left;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+            margin-bottom: 2rem;
+        }
+
+        .terminal-header {
+            background-color: rgba(255, 255, 255, 0.03);
+            padding: 0.6rem 1rem;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .terminal-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .terminal-btn {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .terminal-btn.red { background-color: #ef4444; }
+        .terminal-btn.yellow { background-color: #f59e0b; }
+        .terminal-btn.green { background-color: #10b981; }
+
+        .terminal-title {
+            margin-left: auto;
+            margin-right: auto;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: 'Fira Code', monospace;
+            opacity: 0.7;
+        }
+
+        .terminal-body {
+            padding: 1.2rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.7;
+            height: 160px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.1) transparent;
+        }
+
+        .terminal-body::-webkit-scrollbar {
+            width: 4px;
+        }
+        .terminal-body::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+        }
+
+        .terminal-line {
+            margin-bottom: 0.4rem;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .terminal-prompt {
+            color: var(--primary);
+            margin-right: 8px;
+            user-select: none;
+        }
+
+        .terminal-text {
+            color: #d1d5db;
+            word-break: break-all;
+        }
+
+        .terminal-text.system { color: #a5b4fc; }
+        .terminal-text.success { color: var(--accent-green); }
+        .terminal-text.running { color: var(--accent-orange); }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background-color: var(--primary);
+            margin-left: 4px;
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink {
+            50% { background-color: transparent; }
+        }
+
+        /* Статус-бар внизу */
+        .status-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-orange);
+            box-shadow: 0 0 10px var(--accent-orange);
+            animation: pulseDot 2s infinite;
+        }
+
+        .status-dot.success {
+            background-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        @keyframes pulseDot {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.3); opacity: 1; }
+        }
+
+        /* Медиа-запросы для мобильных */
+        @media (max-width: 600px) {
+            .card {
+                padding: 2rem 1.5rem;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+            .subtitle {
+                font-size: 0.95rem;
+                margin-bottom: 1.8rem;
+            }
+            .terminal-body {
+                height: 180px;
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-symbols">
+        <div class="symbol">&lt;/&gt;</div>
+        <div class="symbol">{ }</div>
+        <div class="symbol">=&gt;</div>
+        <div class="symbol">[ ]</div>
+        <div class="symbol">async</div>
+        <div class="symbol">await</div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div class="logo-container">
+                <div class="logo-ring"></div>
+                <div class="logo-inner">
+                    <!-- Иконка кода -->
+                    <svg viewBox="0 0 24 24">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                </div>
+            </div>
+
+            <h1>Идет обновление CodeRoom</h1>
+            <p class="subtitle">Мы выкатываем новые фичи и улучшаем стабильность. Это займет всего пару минут. Страница обновится автоматически, когда всё будет готово.</p>
+
+            <div class="terminal">
+                <div class="terminal-header">
+                    <div class="terminal-buttons">
+                        <span class="terminal-btn red"></span>
+                        <span class="terminal-btn yellow"></span>
+                        <span class="terminal-btn green"></span>
+                    </div>
+                    <div class="terminal-title">deploy_logs.log</div>
+                </div>
+                <div class="terminal-body" id="terminal-body">
+                    <!-- Сюда JS будет писать логи -->
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">$</span>
+                        <span class="terminal-text system">Initializing deployment monitor...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-container">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Идет сборка и развертывание...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const terminalBody = document.getElementById('terminal-body');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        // Список фейковых логов сборки для имитации активности
+        const deployLogs = [
+            { text: "Fetching repository updates from remote...", delay: 1000 },
+            { text: "Successfully pulled changes from 'origin/main'.", type: "success", delay: 1800 },
+            { text: "Stopping active application containers...", delay: 2800 },
+            { text: "Target ports released. Initiating environment rebuild.", type: "success", delay: 3500 },
+            { text: "Building Docker image 'collab-python-runner'...", delay: 4500 },
+            { text: "Docker image 'collab-python-runner' successfully compiled.", type: "success", delay: 6500 },
+            { text: "Starting multi-stage build for frontend & backend services...", delay: 7500 },
+            { text: "Compiling TypeScript types and schemas...", delay: 9000 },
+            { text: "Optimizing static frontend assets using Vite...", delay: 11000 },
+            { text: "Applying database schema migrations...", delay: 13000 },
+            { text: "Warming up Nginx proxy configuration...", delay: 15500 },
+            { text: "Ready to launch updated app nodes. Checking health status...", type: "running", delay: 17500 }
+        ];
+
+        let logIndex = 0;
+
+        function addTerminalLine(text, type = "") {
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            
+            const prompt = document.createElement('span');
+            prompt.className = 'terminal-prompt';
+            prompt.innerText = '$';
+            
+            const content = document.createElement('span');
+            content.className = `terminal-text ${type}`;
+            content.innerText = text;
+
+            line.appendChild(prompt);
+            line.appendChild(content);
+            terminalBody.appendChild(line);
+
+            // Удаляем старый курсор, если он есть
+            const oldCursor = document.querySelector('.cursor');
+            if (oldCursor) oldCursor.remove();
+
+            // Добавляем новый курсор в конец текущей строки
+            const cursor = document.createElement('span');
+            cursor.className = 'cursor';
+            content.appendChild(cursor);
+
+            // Скроллим терминал вниз
+            terminalBody.scrollTop = terminalBody.scrollHeight;
+        }
+
+        // Постепенный вывод логов
+        function startLogSimulation() {
+            deployLogs.forEach((log) => {
+                setTimeout(() => {
+                    addTerminalLine(log.text, log.type || "");
+                    
+                    // Если дошли до стадии проверки здоровья
+                    if (log.text.includes("Checking health status")) {
+                        statusText.innerText = "Ожидание запуска серверов...";
+                    }
+                }, log.delay);
+            });
+        }
+
+        // Функция проверки здоровья сервера
+        async function checkServerHealth() {
+            try {
+                // Запрашиваем эндпоинт здоровья
+                const response = await fetch('/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.ok === true) {
+                        // Меняем статус на успешный
+                        statusDot.className = "status-dot success";
+                        statusText.innerText = "Сервер онлайн! Загрузка...";
+                        addTerminalLine("Server is ONLINE! Redirecting to CodeRoom...", "success");
+
+                        // Делаем редирект/перезагрузку
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1200);
+                        return;
+                    }
+                }
+            } catch (e) {
+                // Игнорируем сетевые ошибки, так как сервер выключен
+            }
+            
+            // Проверяем снова через 2.5 секунды
+            setTimeout(checkServerHealth, 2500);
+        }
+
+        // Запуск
+        startLogSimulation();
+        // Начинаем проверять здоровье сервера с небольшой задержкой, чтобы дать сборке начаться
+        setTimeout(checkServerHealth, 3000);
+    </script>
+</body>
+</html>
