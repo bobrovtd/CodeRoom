@@ -635,7 +635,7 @@ export function RoomPage() {
                 fontLigatures: true,
                 tabSize: 4,
                 automaticLayout: true,
-                scrollBeyondLastLine: false,
+                scrollBeyondLastLine: true,
                 smoothScrolling: true,
                 cursorBlinking: 'smooth',
                 cursorSmoothCaretAnimation: 'on',
