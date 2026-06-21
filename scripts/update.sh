@@ -10,6 +10,8 @@ echo "Предварительно загружаю образ nginx для за
 docker pull nginx:alpine || true
 
 echo "2/6 Останавливаю основные контейнеры и запускаю страницу-заглушку..."
+# Останавливаем и dev, и prod контейнеры, чтобы избежать конфликтов имен и портов
+docker compose -f docker-compose.yml down || true
 docker compose -f docker-compose.prod.yml down
 
 # Удаляем старый контейнер-заглушку, если он остался от предыдущего запуска
