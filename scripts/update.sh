@@ -15,8 +15,8 @@ docker compose -f docker-compose.prod.yml down
 # Удаляем старый контейнер-заглушку, если он остался от предыдущего запуска
 docker rm -f deploy-placeholder || true
 
-# Запускаем временную заглушку на порту 8080
-docker run -d --name deploy-placeholder -p 127.0.0.1:8080:80 -v "$(pwd)/maintenance:/usr/share/nginx/html" nginx:alpine
+# Запускаем временную заглушку на порту 8080 с конфигурацией роутинга
+docker run -d --name deploy-placeholder -p 127.0.0.1:8080:80 -v "$(pwd)/maintenance:/usr/share/nginx/html" -v "$(pwd)/maintenance/nginx.conf:/etc/nginx/conf.d/default.conf" nginx:alpine
 
 # Функция очистки на случай ошибок при сборке
 cleanup() {

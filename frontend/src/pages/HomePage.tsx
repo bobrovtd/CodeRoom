@@ -31,7 +31,7 @@ export function HomePage() {
       <section className="homePanel">
         <div className="homeHero">
           <p className="eyebrow">Collaborative Python workspace</p>
-          <h1>CodeRoom</h1>
+          <h1>CodeRoom<span style={{ color: '#6366f1' }}>.</span></h1>
           <div className="homeActions">
             <button className="primaryButton largeButton" onClick={createRoom} disabled={creating}>
               {creating ? 'Создание...' : 'Создать комнату'}
