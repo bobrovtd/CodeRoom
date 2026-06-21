@@ -166,6 +166,13 @@ export function RoomPage() {
   const topMenuRef = useRef<HTMLDetailsElement>(null);
   const cursorPositionsRef = useRef<Map<string, monaco.IPosition>>(new Map());
 
+  const closeDropdowns = () => {
+    topMenuRef.current?.removeAttribute('open');
+    document.querySelectorAll('.fileMenu[open]').forEach((el) => {
+      el.removeAttribute('open');
+    });
+  };
+
 
   const activeFile = room?.files.find((file) => file.id === room.activeFileId) || null;
   const activeModelReady = Boolean(activeFile && editorModelReady && editorModelFileId === activeFile.id);
@@ -461,7 +468,7 @@ export function RoomPage() {
     defineEditorThemes(monacoInstance);
     monacoInstance.editor.setTheme(getEditorThemeName(theme));
     editor.onDidFocusEditorWidget(() => {
-      topMenuRef.current?.removeAttribute('open');
+      closeDropdowns();
     });
     editor.addAction({
       id: 'run-code',
@@ -588,7 +595,7 @@ export function RoomPage() {
           </aside>
         )}
 
-        <section className="editorPane" onMouseEnter={() => topMenuRef.current?.removeAttribute('open')}>
+        <section className="editorPane" onMouseEnter={closeDropdowns}>
           <div className="editorTitle">
             <div className="editorTitleMain">
               {!isSidebarOpen && (
