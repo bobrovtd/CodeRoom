@@ -236,7 +236,7 @@ docker compose up --build
     ```bash
     docker build -t collab-python-runner ./runner
     ```
-2.  Настройте переменные окружения в `docker-compose.prod.yml` (замените `https://code-room.ru` на ваш домен).
+2.  Проверьте переменные окружения в `docker-compose.prod.yml` (production-домен: `https://code-room.bob-srv.ru`).
 3.  Запустите стек:
     ```bash
     docker compose -f docker-compose.prod.yml up -d --build
@@ -249,14 +249,14 @@ docker compose up --build
 ```nginx
 server {
     listen 80;
-    server_name code-room.ru;
+    server_name code-room.bob-srv.ru;
 
     # Редирект на HTTPS...
 }
 
 server {
     listen 443 ssl;
-    server_name code-room.ru;
+    server_name code-room.bob-srv.ru;
 
     # SSL сертификаты...
 
