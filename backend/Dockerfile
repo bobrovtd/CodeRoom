@@ -1,7 +1,7 @@
-FROM node:24-slim
+FROM dh-mirror.gitverse.ru/library/node:24-slim
 
 WORKDIR /app
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm install
 COPY . .
 

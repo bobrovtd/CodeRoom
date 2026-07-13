@@ -1,4 +1,9 @@
 services:
+  runner-image:
+    image: dh-mirror.gitverse.ru/library/python:3.12-slim
+    command: ["true"]
+    restart: "no"
+
   backend:
     build:
       context: ./backend
@@ -13,8 +18,11 @@ services:
     environment:
       - PORT=4000
       - CLIENT_ORIGIN=http://localhost:5173
-      - RUNNER_IMAGE=collab-python-runner
+      - RUNNER_IMAGE=dh-mirror.gitverse.ru/library/python:3.12-slim
       - RUN_TIMEOUT_MS=15000
+    depends_on:
+      runner-image:
+        condition: service_completed_successfully
 
   frontend:
     build:

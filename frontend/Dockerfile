@@ -1,8 +1,8 @@
-FROM node:24-slim
+FROM dh-mirror.gitverse.ru/library/node:24-slim
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --fetch-retries=5 --fetch-retry-factor=2 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 --fetch-timeout=300000
+COPY package*.json .npmrc ./
+RUN npm ci
 COPY . .
 
 EXPOSE 5173

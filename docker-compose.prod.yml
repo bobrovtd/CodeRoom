@@ -1,20 +1,35 @@
 services:
+  runner-image:
+    image: dh-mirror.gitverse.ru/library/python:3.12-slim
+    command: ["true"]
+    restart: "no"
+
   backend:
-    image: ghcr.io/bobrovtd/coderoom-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
     restart: unless-stopped
     ports:
       - "127.0.0.1:4000:4000"
     environment:
       - PORT=4000
       - CLIENT_ORIGIN=https://code-room.bob-srv.ru
-      - RUNNER_IMAGE=ghcr.io/bobrovtd/coderoom-runner:latest
+      - RUNNER_IMAGE=dh-mirror.gitverse.ru/library/python:3.12-slim
       - RUN_TIMEOUT_MS=15000
       - RUN_OUTPUT_LIMIT_BYTES=65536
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      runner-image:
+        condition: service_completed_successfully
 
   frontend:
-    image: ghcr.io/bobrovtd/coderoom-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_API_URL=https://code-room.bob-srv.ru
+        - VITE_WS_URL=wss://code-room.bob-srv.ru
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:80"
