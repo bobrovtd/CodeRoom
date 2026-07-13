@@ -1,27 +1,20 @@
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.prod
+    image: ghcr.io/bobrovtd/coderoom-backend:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:4000:4000"
     environment:
       - PORT=4000
       - CLIENT_ORIGIN=https://code-room.bob-srv.ru
-      - RUNNER_IMAGE=collab-python-runner
+      - RUNNER_IMAGE=ghcr.io/bobrovtd/coderoom-runner:latest
       - RUN_TIMEOUT_MS=15000
       - RUN_OUTPUT_LIMIT_BYTES=65536
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
-      args:
-        - VITE_API_URL=https://code-room.bob-srv.ru
-        - VITE_WS_URL=wss://code-room.bob-srv.ru
+    image: ghcr.io/bobrovtd/coderoom-frontend:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:80"
