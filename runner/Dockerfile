@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM dh-mirror.gitverse.ru/library/python:3.12-slim
 
 WORKDIR /app
 
