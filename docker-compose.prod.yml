@@ -14,7 +14,7 @@ services:
     environment:
       - PORT=4000
       - CLIENT_ORIGIN=https://code-room.bob-srv.ru
-      - RUNNER_IMAGE=dh-mirror.gitverse.ru/library/python:3.12-slim
+      - RUNNER_IMAGE=collab-python-runner
       - RUN_TIMEOUT_MS=15000
       - RUN_OUTPUT_LIMIT_BYTES=65536
     volumes:
