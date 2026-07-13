@@ -4,8 +4,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile.prod
     restart: unless-stopped
-    expose:
-      - "4000"
+    ports:
+      - "127.0.0.1:4000:4000"
     environment:
       - PORT=4000
       - CLIENT_ORIGIN=https://code-room.bob-srv.ru
