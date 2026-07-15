@@ -24,9 +24,7 @@ jobs:
           - name: frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile.prod
-            build_args: |
-              VITE_API_URL=https://code-room.bob-srv.ru
-              VITE_WS_URL=wss://code-room.bob-srv.ru
+            build_args: ""
           - name: runner
             context: ./runner
             dockerfile: ./runner/Dockerfile

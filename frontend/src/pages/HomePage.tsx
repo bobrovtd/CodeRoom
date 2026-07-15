@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_URL } from '../config';
+import { API_BASE_URL } from '../config';
 import { ThemeToggle } from '../theme';
 
 export function HomePage() {
@@ -12,7 +12,7 @@ export function HomePage() {
     setCreating(true);
     setError('');
     try {
-      const response = await fetch(`${API_URL}/api/rooms`, { method: 'POST' });
+      const response = await fetch(`${API_BASE_URL}/rooms`, { method: 'POST' });
       if (!response.ok) throw new Error('Не удалось создать комнату');
       const data = (await response.json()) as { roomId: string };
       navigate(`/room/${data.roomId}`);

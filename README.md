@@ -176,7 +176,7 @@ docker compose up --build
 | Переменная | Описание | Значение по умолчанию |
 | :--- | :--- | :--- |
 | `PORT` | Порт запуска Express сервера | `4000` |
-| `CLIENT_ORIGIN` | Разрешенный источник CORS для фронтенда | `http://localhost:5173` |
+| `ALLOWED_ORIGINS` | Необязательный список origins для cross-origin разработки, через запятую | Не задан (CORS выключен) |
 | `RUNNER_IMAGE` | Имя Docker-образа для песочницы | `collab-python-runner` |
 | `DOCKER_SOCKET` | Путь к сокету Docker API | Windows: Named Pipe, Linux/macOS: `/var/run/docker.sock` |
 | `RUN_TIMEOUT_MS` | Максимальное время выполнения кода (мс) | `15000` (15 сек) |
@@ -186,8 +186,8 @@ docker compose up --build
 
 | Переменная | Описание | Значение по умолчанию |
 | :--- | :--- | :--- |
-| `VITE_API_URL` | URL REST API бэкенда | `http://localhost:4000` |
-| `VITE_WS_URL` | Базовый URL для WebSocket-сервера | `ws://localhost:4000` |
+| `VITE_API_BASE_URL` | Базовый URL REST API; можно переопределить локально | `/api` |
+| `VITE_WS_BASE_URL` | Базовый WebSocket URL; можно переопределить локально | Текущий host и автоматический `ws://`/`wss://` |
 
 ---
 
@@ -236,7 +236,7 @@ docker compose up --build
     ```bash
     docker build -t collab-python-runner ./runner
     ```
-2.  Проверьте переменные окружения в `docker-compose.prod.yml` (production-домен: `https://code-room.bob-srv.ru`).
+2.  Проверьте конфигурацию: `docker compose -f docker-compose.prod.yml config`.
 3.  Запустите стек:
     ```bash
     docker compose -f docker-compose.prod.yml up -d --build
@@ -244,54 +244,10 @@ docker compose up --build
 
 ### 🔒 Настройка Reverse Proxy (Nginx)
 
-При использовании Nginx в качестве балансировщика, обязательно настройте проксирование WebSocket:
-
-```nginx
-server {
-    listen 80;
-    server_name code-room.bob-srv.ru;
-
-    # Редирект на HTTPS...
-}
-
-server {
-    listen 443 ssl;
-    server_name code-room.bob-srv.ru;
-
-    # SSL сертификаты...
-
-    # Frontend статика (обслуживается Nginx контейнером на порту 8080)
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    # REST API Backend
-    location /api/ {
-        proxy_pass http://127.0.0.1:4000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    # Health Check
-    location /health {
-        proxy_pass http://127.0.0.1:4000;
-    }
-
-    # WebSockets (API & Yjs Sync)
-    location ~ ^/(ws|yjs/) {
-        proxy_pass http://127.0.0.1:4000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_read_timeout 3600s;
-        proxy_send_timeout 3600s;
-    }
-}
-```
+Используйте готовый файл `nginx.code-room.conf`: он маршрутизирует `/` на
+frontend, сохраняет `/api/*` при передаче в backend и отдельно проксирует `/ws`
+и `/yjs/*` с WebSocket-заголовками. Полные команды установки, проверки и
+перезапуска приведены в `DEPLOY.md`.
 
 ---
 

@@ -7,9 +7,20 @@ import { attachRealtime, runAndBroadcast } from './realtime.js';
 const app = express();
 const server = http.createServer(app);
 const port = Number(process.env.PORT || 4000);
-const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors({ origin: clientOrigin }));
+if (allowedOrigins.includes('*')) {
+  throw new Error('ALLOWED_ORIGINS must contain explicit origins, not "*"');
+}
+
+if (allowedOrigins.length > 0) {
+  app.use(cors({
+    origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin))
+  }));
+}
 app.use(express.json());
 
 app.get('/health', (_req, res) => {

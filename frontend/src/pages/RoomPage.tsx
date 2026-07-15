@@ -6,7 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { MonacoBinding } from 'y-monaco';
-import { API_URL, WS_URL } from '../config';
+import { API_BASE_URL, WS_BASE_URL } from '../config';
 import { ThemeToggle, useTheme } from '../theme';
 import type { RoomFile, RoomState, RunResult, ServerMessage } from '../types';
 
@@ -182,7 +182,7 @@ export function RoomPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_URL}/api/rooms/${roomId}`)
+    fetch(`${API_BASE_URL}/rooms/${roomId}`)
       .then(async (response) => {
         if (!response.ok) throw new Error('Комната не найдена');
         return (await response.json()) as RoomState;
@@ -205,7 +205,7 @@ export function RoomPage() {
     if (!joinedName || !roomId) return;
 
     const ydoc = new Y.Doc();
-    const provider = new WebsocketProvider(`${WS_URL}/yjs`, roomId, ydoc, { connect: true });
+    const provider = new WebsocketProvider(`${WS_BASE_URL}/yjs`, roomId, ydoc, { connect: true });
     ydocRef.current = ydoc;
     providerRef.current = provider;
     setInitialSyncComplete(provider.synced);
@@ -220,7 +220,7 @@ export function RoomPage() {
     let closedByCleanup = false;
     let reconnectTimer: number | undefined;
     let reconnectAttempt = 0;
-    const yjsConnectionError = 'Editor WebSocket is not connected. Check VITE_WS_URL and the ws/wss protocol.';
+    const yjsConnectionError = 'Editor WebSocket is not connected. Check VITE_WS_BASE_URL and the ws/wss protocol.';
     const syncTimeout = window.setTimeout(() => {
       if (!closedByCleanup && !provider.synced) setError(yjsConnectionError);
     }, 5000);
@@ -272,7 +272,7 @@ export function RoomPage() {
     updateRemoteSelectionStyles();
 
     const connectApiSocket = () => {
-      const ws = new WebSocket(`${WS_URL}/ws`);
+      const ws = new WebSocket(`${WS_BASE_URL}/ws`);
       wsRef.current = ws;
 
       ws.onopen = () => {
